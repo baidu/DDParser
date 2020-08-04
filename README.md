@@ -129,7 +129,7 @@ CUDA_VISIBLE_DEVICES=0 python run.py \
 
 **基于已分词数据的预测**<br>
 
-预测的输入数据要求以[`CoNLL-X`](#数据格式说明)([官方说明](https://ilk.uvt.nl/~emarsi/download/pubs/14964.pdf))格式组织，缺失字段使用“-”代替。通过执行`sh run_predict.sh`使进行预测，详细命令如下所示：
+预测的输入数据要求以[`CoNLL-X`](#数据格式说明)([官方说明](https://ilk.uvt.nl/~emarsi/download/pubs/14964.pdf))格式组织，缺失字段使用“-”代替。通过执行`sh run_predict.sh`进行预测，详细命令如下所示：
 ```shell
 CUDA_VISIBLE_DEVICES=0 python run.py \
                                 --mode=predict \
@@ -143,7 +143,7 @@ CUDA_VISIBLE_DEVICES=0 python run.py \
 <font size=3 color=gray>注：用户可通过修改`infer_data_path`和`infer_result_path`指定要预测的数据集和预测结果的路径。</font>
 
 **基于未分词数据的预测**<br>
-预测的输入数据为字符串形式，一行一条数据。用通过执行`sh run_predict_query.sh`对来自标准输入的数据进行预测，详细命令如下所示：
+预测的输入数据为字符串形式，一行一条数据。通过执行`sh run_predict_query.sh`对来自标准输入的数据进行预测，详细命令如下所示：
 ```shell
 CUDA_VISIBLE_DEVICES=0 python run.py \
                                 --mode=predict_q \
