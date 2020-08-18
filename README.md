@@ -64,6 +64,8 @@ DDParser(Bai**d**u **D**ependency **Parser**)是百度自然语言处理部基�
 >>> ddp = DDParser(prob=True, use_pos=True)
 >>> ddp.parse(["百度是一家高科技公司"])
 [{'word': ['百度', '是', '一家', '高科技', '公司'], 'postag': ['ORG', 'v', 'm', 'n', 'n'], 'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'], 'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
+>>> # buckets=True, 数据集长度不均时处理速度更快
+>>> ddp = DDParser(buckets=True)
 ```
 
 #### 已分词方式

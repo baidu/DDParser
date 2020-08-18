@@ -119,6 +119,9 @@ def eisner(scores, mask):
     p_c = np.zeros((seq_len, seq_len, batch_size), dtype=np.int64)
     # set 0 to s_c.diagonal
     s_c = nn.fill_diagonal(s_c, 0)
+    # contiguous
+    s_c = np.ascontiguousarray(s_c)
+    s_i = np.ascontiguousarray(s_i)
     for w in range(1, seq_len):
         n = seq_len - w
         starts = np.arange(n, dtype=np.int64)[np.newaxis, :]
