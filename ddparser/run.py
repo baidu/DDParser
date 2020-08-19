@@ -332,13 +332,19 @@ class DDParser(object):
         'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'], 'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
         """
         if not self.lac:
-            self.lac = LAC.LAC(mode='lac' if self.use_pos else "seg")
+            self.lac = LAC.LAC(mode='lac' if self.use_pos else "seg",
+                               use_cuda=self.args.use_cuda)
         if not inputs:
             return
         if isinstance(inputs, str):
             inputs = [inputs]
         if all([isinstance(i, str) and i for i in inputs]):
-            lac_results = self.lac.run(inputs)
+            lac_results = []
+            position = 0
+            while position < len(inputs):
+                lac_results += self.lac.run(inputs[position:position +
+                                                   self.args.batch_size])
+                position += self.args.batch_size
             predicts = Corpus.load_lac_results(lac_results, self.env.fields)
         else:
             logging.warning("please check the foramt of your inputs.")
