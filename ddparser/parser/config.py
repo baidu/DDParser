@@ -81,7 +81,7 @@ class ArgConfig(configparser.ConfigParser):
                        "--pre_emb",
                        help='path to pretrained embeddings')
         data_g.add_arg('--batch_size',
-                       default=5000,
+                       default=1000,
                        type=int,
                        help='batch size')
 

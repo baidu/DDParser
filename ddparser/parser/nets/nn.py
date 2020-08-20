@@ -124,7 +124,8 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
     tensor([[ 0,  5, 10],
             [ 6, 11, 16]])
     '''
-    x = np.ascontiguousarray(x)
+    if not x.flags['C_CONTIGUOUS']:
+        x = np.ascontiguousarray(x)
     strides = x.strides
     m = strides[0] + strides[1]
     k = strides[1] if dim == 1 else strides[0]
