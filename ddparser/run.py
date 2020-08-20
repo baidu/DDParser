@@ -253,7 +253,8 @@ class DDParser(object):
     use_pos: BOOL, 是否返回词性标签(仅parse函数生效)
     model_files_path: str, 模型地址, 为None时下载默认模型
     buckets: BOOL, 是否对样本分桶. 若buckets=True，则会对inputs按长度分桶，处理长度不均匀的输入速度更新快，default=False
-    batch_size: INT， 批尺寸, 当buckets为False时，每个batch大小均等于batch_size; 当buckets不为True时，每个batch的大小约为 batch_size / 当前桶中句子平均长度 。default=None，使用默认的batch_size。
+    batch_size: INT, 批尺寸, 当buckets为False时，每个batch大小均等于batch_size; 当buckets为True时，每个batch的大小约为'batch_size / 当前桶句子的平均长度'。
+                当default=None时，分桶batch_size默认等于1000，不分桶默认等于50。
     """
     def __init__(self,
                  use_cuda=False,
@@ -303,6 +304,9 @@ class DDParser(object):
             self.env.fields = self.env.fields._replace(PHEAD=Field('prob'))
         if self.use_pos:
             self.env.fields = self.env.fields._replace(CPOS=Field('postag'))
+        # set default batch size if batch_size is None and not buckets
+        if batch_size is None and not buckets:
+            self.args.batch_size = 50
 
     def parse(self, inputs):
         """
