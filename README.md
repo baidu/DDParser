@@ -8,7 +8,7 @@
    - [文件结构](#文件结构)
    - [后期计划](#后期计划)
    - [参考资料](#参考资料)
-   - [在论文中引用DDParser](#在论文中引用DDParser)
+   - [文献引用](#文献引用)
    - [如何贡献](#如何贡献)
 
 [![PyPi Latest Release](https://img.shields.io/pypi/v/ddparser.svg)](https://pypi.org/project/ddparser/)
@@ -234,7 +234,7 @@ DuCTB1.0：`Baidu Chinese Treebank 1.0`是百度构建的中文依存句法树�
 ## 参考资料
 本项目所用方法出自论文[《Deep Biaffine Attention for Neural Dependency Parsing》](https://arxiv.org/abs/1611.01734)，对应的pytorch版本参见[yzhangcs/parser](https://github.com/yzhangcs/parser)。
 
-## 在论文中引用DDParser
+## 文献引用
 如果您的学术工作成果中使用了DDParser，请您增加下述引用。我们非常欣慰DDParser能够对您的学术工作带来帮助。
 ```text
 @misc{zhang2020practical,
