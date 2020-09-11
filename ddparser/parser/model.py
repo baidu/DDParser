@@ -277,7 +277,7 @@ def decode(args, s_arc, s_rel, mask):
     bad = [not utils.istree(seq[:i + 1]) for i, seq in zip(lens, arc_preds)]
     if args.tree and any(bad):
         arc_preds[bad] = utils.eisner(s_arc.numpy()[bad], mask[bad])
-    arc_preds = dygraph.to_variable(arc_preds)
+    arc_preds = dygraph.to_variable(arc_preds, zero_copy=False)
     rel_preds = layers.argmax(s_rel, axis=-1)
     batch_size, seq_len, _ = rel_preds.shape
     rel_preds = nn.index_sample(rel_preds, layers.unsqueeze(arc_preds, -1))

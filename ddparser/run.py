@@ -103,7 +103,7 @@ def train(env):
     total_time = datetime.timedelta()
     best_e, best_metric = 1, Metric()
 
-    puncts = dygraph.to_variable(env.puncts)
+    puncts = dygraph.to_variable(env.puncts, zero_copy=False)
     logging.info("start training.")
     for epoch in range(1, args.epochs + 1):
         start = datetime.datetime.now()
@@ -142,7 +142,7 @@ def train(env):
 def evaluate(env):
     """Evaluate"""
     args = env.args
-    puncts = dygraph.to_variable(env.puncts)
+    puncts = dygraph.to_variable(env.puncts, zero_copy=False)
 
     logging.info("Load the dataset")
     evaluates = Corpus.load(args.test_data_path, env.fields)
