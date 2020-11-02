@@ -14,5 +14,6 @@ python -u run.py \
         --train_data_path=data/baidu/train.txt \
         --valid_data_path=data/baidu/dev.txt \
         --test_data_path=data/baidu/test.txt \
+        --encoding_model=lstm \
         --unk=UNK \
-        --buckets=15
+        --buckets=15 

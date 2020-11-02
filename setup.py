@@ -32,17 +32,17 @@ install_requires = []
 try:
     import paddle
     # 若版本太低，设置版本的更新
-    if paddle.__version__ < '1.8.2':
+    if paddle.__version__ < '1.8.2' or paddle.__version__ > '2.0':
         installed_packages = pkg_resources.working_set
         paddle_pkgs = [i.key for i in installed_packages if "paddle" in i.key]
 
         if "paddlepaddle-gpu" in paddle_pkgs:
-            install_requires = ['paddlepaddle-gpu>=1.8.2']
+            install_requires = ['paddlepaddle-gpu>=1.8.2, <2.0']
         elif "paddlepaddle" in paddle_pkgs:
-            install_requires = ['paddlepaddle>=1.8.2']
+            install_requires = ['paddlepaddle>=1.8.2, <2.0']
 
 except ImportError:
-    install_requires = ['paddlepaddle>=1.8.2']
+    install_requires = ['paddlepaddle>=1.8.2, <2.0']
 try:
     import LAC
     # 若版本太低，设置版本的更新
@@ -55,7 +55,7 @@ with open("README.md", "r", encoding='utf8') as fh:
     long_description = fh.read()
 setup(
     name="ddparser",
-    version="0.1.1",
+    version="0.1.2",
     author="Baidu NLP",
     author_email="nlp-parser@baidu.com",
     description="A chinese dependency parser tool by Baidu NLP.",

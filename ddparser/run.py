@@ -129,7 +129,7 @@ def train(env):
             if epoch - best_e >= args.patience:
                 break
     if args.local_rank == 0:
-        model = load(args.model_path)
+        model = load(args.model_path, model)
         loss, metric = epoch_evaluate(args, model, test.loader, puncts)
         logging.info(
             f"max score of dev is {best_metric.score:.2%} at epoch {best_e}")
@@ -263,16 +263,25 @@ class DDParser(object):
                  use_pos=False,
                  model_files_path=None,
                  buckets=False,
-                 batch_size=None):
+                 batch_size=None,
+                 encoding_model='lstm'):
         if model_files_path is None:
-            model_files_path = self._get_abs_path('./model_files/baidu')
+            if encoding_model == 'lstm':
+                model_files_path = self._get_abs_path('./model_files/lstm')
+            elif encoding_model == 'transformer':
+                model_files_path = self._get_abs_path(
+                    './model_files/transformer')
+            else:
+                raise "Unknown encoding model."
+
             if not os.path.exists(model_files_path):
                 try:
-                    utils.download_model_from_url(model_files_path)
+                    utils.download_model_from_url(model_files_path,
+                                                  encoding_model)
                 except Exception as e:
                     logging.error("Failed to download model, please try again")
                     logging.error(f"error: {e}")
-                    return
+                    raise e
 
         args = [
             f"--model_files={model_files_path}",

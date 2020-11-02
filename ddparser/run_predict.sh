@@ -9,6 +9,7 @@ set -x
 python  run.py \
         --mode=predict \
         --use_cuda \
+        --encoding_model=transformer \
         --model_files=model_files/baidu \
         --infer_data_path=data/baidu/test.txt \
         --infer_result_path=data/baidu/test.predict \

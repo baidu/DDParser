@@ -1,9 +1,11 @@
-data_files_path="./data"
-
+# DATA PATH
+DATA_FILES_PATH="./data"
+# DATA FILE NAME
+DATA_FILES_NAME=DDParser_dataset-1.0.0.tar.gz
 #get data
-if [ ! -d $data_files_path ]; then
-	mkdir $data_files_path
+if [ ! -d $DATA_FILES_PATH ]; then
+	mkdir $DATA_FILES_PATH
 fi
-wget --no-check-certificate https://ddparser.bj.bcebos.com/DDParser_dataset-1.0.0.tar.gz
-tar xzf DDParser_dataset-1.0.0.tar.gz -C $data_files_path
-rm DDParser_dataset-1.0.0.tar.gz
+wget --no-check-certificate https://ddparser.bj.bcebos.com/$DATA_FILES_NAME
+tar xzf $DATA_FILES_NAME -C $DATA_FILES_PATH
+rm $DATA_FILES_NAME

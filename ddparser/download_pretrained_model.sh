@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-model_files_path="./model_files"
+# MODEL PATH
+MODEL_FILES_PATH="./model_files"
+# MODEL_NAME
+MODEL_FILES_NAME=DDParser-char-lstm-0.1.2.tar.gz
 
 #get pretrained_char_model
-wget --no-check-certificate https://ddparser.bj.bcebos.com/DDParser-char-0.1.0.tar.gz
-if [ ! -d $model_files_path ]; then
-	mkdir $model_files_path
+wget --no-check-certificate https://ddparser.bj.bcebos.com/$MODEL_FILES_NAME
+if [ ! -d $MODEL_FILES_PATH ]; then
+	mkdir $MODEL_FILES_PATH
 fi
-tar xzf DDParser-char-0.1.0.tar.gz -C $model_files_path
-rm DDParser-char-0.1.0.tar.gz
+tar xzf $MODEL_FILES_NAME -C $MODEL_FILES_PATH
+rm $MODEL_FILES_NAME

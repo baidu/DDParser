@@ -22,10 +22,12 @@ from .dropouts import SharedDropout
 from .biaffine import Biaffine
 from .bilstm import BiLSTM
 from .char_lstm import CharLSTM
+from .transformer import Transformer
+from .char_transformer import CharTransformer
 from .mlp import MLP
 from .rnn import BasicLSTMUnit
 
 __all__ = [
-    'BasicLSTMUnit', 'Biaffine', 'BiLSTM', 'CharLSTM', 'IndependentDropout',
-    'MLP', 'SharedDropout'
+    'BasicLSTMUnit', 'Biaffine', 'BiLSTM', 'CharLSTM', 'CharTransformer',
+    'IndependentDropout', 'MLP', 'SharedDropout', 'Transformer'
 ]

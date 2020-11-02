@@ -132,6 +132,10 @@ class ArgConfig(configparser.ConfigParser):
                         default='char',
                         choices=['pos', 'char'],
                         help='choices of additional features')
+        train_g.add_arg('--encoding_model',
+                        default='lstm',
+                        choices=['lstm', 'transformer'],
+                        help='choices of encode model')
         train_g.add_arg('--buckets',
                         default=15,
                         type=int,

@@ -39,7 +39,12 @@ pad = '<pad>'
 unk = '<unk>'
 bos = '<bos>'
 
-DOWNLOAD_MODEL_PATH = "https://ddparser.bj.bcebos.com/DDParser-char-0.1.0.tar.gz"
+DOWNLOAD_MODEL_PATH_DICT = {
+    'lstm':
+    "https://ddparser.bj.bcebos.com/DDParser-char-lstm-0.1.2.tar.gz",
+    "transformer":
+    "https://ddparser.bj.bcebos.com/DDParser-char-transformer-0.1.2.tar.gz"
+}
 
 
 def kmeans(x, k):
@@ -284,10 +289,11 @@ def init_log(
         logger.addHandler(handler)
 
 
-def download_model_from_url(path):
+def download_model_from_url(path, model='lstm'):
     """Downlod the model from url"""
     if os.path.exists(path):
         return
+    download_model_path = DOWNLOAD_MODEL_PATH_DICT[model]
     logging.info(
         "The first run will download the pre-trained model, which will take some time, please be patient!"
     )
@@ -300,14 +306,14 @@ def download_model_from_url(path):
     # downloding the model.
     context = ssl._create_unverified_context()
     file_size = int(
-        urlopen(DOWNLOAD_MODEL_PATH,
+        urlopen(download_model_path,
                 context=context).info().get('Content-Length', -1))
     pbar = tqdm(total=file_size,
                 initial=0,
                 unit='B',
                 unit_scale=True,
                 desc="loading ddparser model:")
-    req = requests.get(DOWNLOAD_MODEL_PATH, stream=True, verify=False)
+    req = requests.get(download_model_path, stream=True, verify=False)
     with (open(file_path, 'ab')) as f:
         for chunk in req.iter_content(chunk_size=1024):
             if chunk:

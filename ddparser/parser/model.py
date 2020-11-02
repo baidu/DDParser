@@ -38,9 +38,11 @@ from ddparser.parser.nets import nn
 from ddparser.parser.nets import Biaffine
 from ddparser.parser.nets import BiLSTM
 from ddparser.parser.nets import CharLSTM
+from ddparser.parser.nets import CharTransformer
 from ddparser.parser.nets import IndependentDropout
 from ddparser.parser.nets import MLP
 from ddparser.parser.nets import SharedDropout
+from ddparser.parser.nets import Transformer
 
 
 class Model(dygraph.Layer):
@@ -70,33 +72,52 @@ class Model(dygraph.Layer):
                     size=args.pretrained_embed_shape)
         # Initialize feat feature, feat can be char or pos
         if args.feat == 'char':
-            self.feat_embed = CharLSTM(n_chars=args.n_feats,
-                                       n_embed=args.n_char_embed,
-                                       n_out=args.n_feat_embed,
-                                       pad_index=args.feat_pad_index)
+            if args.encoding_model == "lstm":
+                self.feat_embed = CharLSTM(n_chars=args.n_feats,
+                                           n_embed=args.n_char_embed,
+                                           n_out=args.n_lstm_feat_embed,
+                                           pad_index=args.feat_pad_index)
+            else:
+                self.feat_embed = CharTransformer(
+                    n_chars=args.n_feats,
+                    n_out=args.n_tran_feat_embed,
+                    pad_index=args.feat_pad_index,
+                    nums_heads=args.n_tran_feat_head,
+                    num_layers=args.n_tran_feat_layer)
+
         else:
             self.feat_embed = dygraph.Embedding(size=(args.n_feats,
                                                       args.n_feat_embed))
         self.embed_dropout = IndependentDropout(p=args.embed_dropout)
-
-        # lstm layer
-        self.lstm = BiLSTM(input_size=args.n_embed + args.n_feat_embed,
-                           hidden_size=args.n_lstm_hidden,
-                           num_layers=args.n_lstm_layers,
-                           dropout=args.lstm_dropout)
-        self.lstm_dropout = SharedDropout(p=args.lstm_dropout)
+        if args.encoding_model == "lstm":
+            # lstm layer
+            self.lstm = BiLSTM(input_size=args.n_embed +
+                               args.n_lstm_feat_embed,
+                               hidden_size=args.n_lstm_hidden,
+                               num_layers=args.n_lstm_layers,
+                               dropout=args.lstm_dropout)
+            self.lstm_dropout = SharedDropout(p=args.lstm_dropout)
+            mlp_input_size = args.n_lstm_hidden * 2
+        else:
+            self.transformer = Transformer(hidden_size=args.n_embed +
+                                           args.n_tran_feat_embed,
+                                           vocab_size=args.n_words,
+                                           name="word_transformer",
+                                           num_heads=args.n_tran_word_head,
+                                           num_layers=args.n_tran_word_layer)
+            mlp_input_size = args.n_embed + args.n_tran_feat_embed
 
         # mlp layer
-        self.mlp_arc_h = MLP(n_in=args.n_lstm_hidden * 2,
+        self.mlp_arc_h = MLP(n_in=mlp_input_size,
                              n_out=args.n_mlp_arc,
                              dropout=args.mlp_dropout)
-        self.mlp_arc_d = MLP(n_in=args.n_lstm_hidden * 2,
+        self.mlp_arc_d = MLP(n_in=mlp_input_size,
                              n_out=args.n_mlp_arc,
                              dropout=args.mlp_dropout)
-        self.mlp_rel_h = MLP(n_in=args.n_lstm_hidden * 2,
+        self.mlp_rel_h = MLP(n_in=mlp_input_size,
                              n_out=args.n_mlp_rel,
                              dropout=args.mlp_dropout)
-        self.mlp_rel_d = MLP(n_in=args.n_lstm_hidden * 2,
+        self.mlp_rel_d = MLP(n_in=mlp_input_size,
                              n_out=args.n_mlp_rel,
                              dropout=args.mlp_dropout)
 
@@ -127,14 +148,16 @@ class Model(dygraph.Layer):
         if hasattr(self, 'pretrained'):
             word_embed += self.pretrained(words)
         feat_embed = self.feat_embed(feats)
-
         word_embed, feat_embed = self.embed_dropout(word_embed, feat_embed)
         # concatenate the word and feat representations
         # embed.size = (batch, seq_len, n_embed * 2)
         embed = layers.concat((word_embed, feat_embed), axis=-1)
 
-        x, _ = self.lstm(embed, mask, self.pad_index)
-        x = self.lstm_dropout(x)
+        if self.args.encoding_model == "lstm":
+            x, _ = self.lstm(embed, mask, self.pad_index)
+            x = self.lstm_dropout(x)
+        else:
+            _, x = self.transformer(words, word_emb=embed)
 
         # apply MLPs to the BiLSTM output states
         arc_h = self.mlp_arc_h(x)
@@ -293,11 +316,12 @@ def save(path, args, model, optimizer):
         pickle.dump(args, f)
 
 
-def load(path):
+def load(path, model=None):
     """Loading model"""
-    with open(path + ".args", "rb") as f:
-        args = pickle.load(f)
-    model = Model(args)
+    if model is None:
+        with open(path + ".args", "rb") as f:
+            args = pickle.load(f)
+        model = Model(args)
     model_state, _ = fluid.load_dygraph(path)
     model.set_dict(model_state)
     return model
