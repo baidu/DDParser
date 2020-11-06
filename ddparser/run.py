@@ -185,6 +185,7 @@ def predict(env):
 
     logging.info("Make predictions on the dataset")
     start = datetime.datetime.now()
+    model.eval()
     pred_arcs, pred_rels, pred_probs = epoch_predict(env, args, model,
                                                      dataset.loader)
     total_time = datetime.datetime.now() - start
@@ -206,6 +207,7 @@ def predict_query(env):
     args = env.args
     logging.info("Load the model")
     model = load(args.model_path)
+    model.eval()
     lac_mode = "seg" if args.feat != "pos" else "lac"
     lac = LAC.LAC(mode=lac_mode)
     if args.prob:
@@ -304,6 +306,7 @@ class DDParser(object):
         self.args = self.env.args
         fluid.enable_imperative(self.env.place)
         self.model = load(self.args.model_path)
+        self.model.eval()
         self.lac = None
         self.use_pos = use_pos
         # buckets=None if not buckets else defaults

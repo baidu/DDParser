@@ -244,8 +244,6 @@ def epoch_evaluate(args, model, loader, puncts):
 @dygraph.no_grad
 def epoch_predict(env, args, model, loader):
     """Predict in one epoch"""
-    model.eval()
-
     arcs, rels, probs = [], [], []
     for words, feats in loader():
         # ignore the first token of each sentence
