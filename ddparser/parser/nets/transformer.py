@@ -54,17 +54,6 @@ class Transformer(dygraph.Layer):
         }
         self.transformer = ErnieModel(cfg, name=name)
 
-    def __repr__(self):
-        """repr"""
-        s = self.__class__.__name__ + '('
-        s += f"{self.input_size}, {self.hidden_size}"
-        if self.num_layers > 1:
-            s += f", num_layers={self.num_layers}"
-        if self.dropout > 0:
-            s += f", dropout={self.dropout}"
-        s += ')'
-
-        return s
 
     def forward(self,
                 src_ids,
@@ -75,6 +64,7 @@ class Transformer(dygraph.Layer):
                 attn_bias=None,
                 past_cache=None,
                 use_causal_mask=False):
+        """Forward network"""
         return self.transformer(src_ids, word_emb, sent_ids, pos_ids,
                                 input_mask, attn_bias, past_cache,
                                 use_causal_mask)

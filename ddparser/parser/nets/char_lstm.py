@@ -39,15 +39,6 @@ class CharLSTM(dygraph.Layer):
         # the lstm layer
         self.lstm = BiLSTM(input_size=n_embed, hidden_size=n_out // 2)
 
-    def __repr__(self):
-        """repr"""
-        s = self.__class__.__name__ + '('
-        s += f"{self.n_chars}, {self.n_embed}, "
-        s += f"n_out={self.n_out}, "
-        s += f"pad_index={self.pad_index}"
-        s += ')'
-
-        return s
 
     def forward(self, x):
         """Forward network"""

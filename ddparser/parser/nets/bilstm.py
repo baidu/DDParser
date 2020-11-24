@@ -60,17 +60,6 @@ class BiLSTM(dygraph.Layer):
                     bias_attr=initializer.ConstantInitializer(value=0.0)))
             input_size = hidden_size * 2
 
-    def __repr__(self):
-        """repr"""
-        s = self.__class__.__name__ + '('
-        s += f"{self.input_size}, {self.hidden_size}"
-        if self.num_layers > 1:
-            s += f", num_layers={self.num_layers}"
-        if self.dropout > 0:
-            s += f", dropout={self.dropout}"
-        s += ')'
-
-        return s
 
     def permute_hidden(self, hx, index=None):
         """permute hx by index

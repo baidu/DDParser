@@ -38,16 +38,7 @@ class MLP(dygraph.Layer):
             bias_attr=None,
         )
         self.dropout = SharedDropout(p=dropout)
-
-    def __repr__(self):
-        """repr"""
-        s = self.__class__.__name__ + '('
-        s += f"n_in={self.n_in}, n_out={self.n_out}"
-        if self.dropout.p > 0:
-            s += f", dropout={self.dropout.p}"
-        s += ')'
-
-        return s
+        
 
     def forward(self, x):
         """Forward network"""

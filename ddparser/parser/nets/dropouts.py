@@ -30,13 +30,6 @@ class SharedDropout(dygraph.Layer):
         self.p = p
         self.batch_first = batch_first
 
-    def __repr__(self):
-        """repr"""
-        s = f"p={self.p}"
-        if self.batch_first:
-            s += f", batch_first={self.batch_first}"
-
-        return s
 
     def forward(self, x):
         """Forward network"""

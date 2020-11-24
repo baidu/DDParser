@@ -69,6 +69,8 @@ DDParser(Bai**d**u **D**ependency **Parser**)是百度自然语言处理部基�
 >>> ddp = DDParser(buckets=True)
 >>> # 选择使用transformer模型
 >>> ddp = DDParser(encoding_model='transformer')
+>>> # 使用GPU
+>>> ddp = DDParser(use_cuda=True)
 ```
 
 #### 已分词方式

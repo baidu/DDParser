@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #################################################################################
-"""本文件定义CharLSTM网络"""
+"""本文件定义CharTransformer网络"""
 
 import numpy as np
 from paddle.fluid import dygraph

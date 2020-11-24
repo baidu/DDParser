@@ -168,10 +168,8 @@ def index_sample(x, index):
     Arags：
         input: input matrix
         index: index matrix
-
     Returns:
         output
-
     >>> input
     [
         [1, 2, 3],

@@ -36,15 +36,6 @@ class Biaffine(dygraph.Layer):
                                                      n_in + bias_y),
                                               dtype="float32")
 
-    def __repr__(self):
-        """repr"""
-        s = f"n_in={self.n_in}, n_out={self.n_out}"
-        if self.bias_x:
-            s += f", bias_x={self.bias_x}"
-        if self.bias_y:
-            s += f", bias_y={self.bias_y}"
-
-        return s
 
     def forward(self, x, y):
         """Forward network"""
