@@ -21,7 +21,8 @@ import os
 import sys
 import time
 import multiprocessing
-sys.path.insert(0, "../../../../")
+sys.path.insert(0, "../../../")
+
 # NOTE(paddle-dev): All of these flags should be
 # set before `import paddle`. Otherwise, it would
 # not take any effect.

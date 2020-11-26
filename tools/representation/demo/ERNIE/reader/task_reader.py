@@ -22,11 +22,11 @@ from collections import namedtuple
 
 import tokenization
 from batching import pad_batch_data
-from ddparser.tools.representation.graph import get_arcs_and_head_in_wordpiece
-from ddparser.tools.representation.graph import pad_batch_graphs
-from ddparser.tools.representation.graph import get_adj_of_one_sent_in_ernie
-from ddparser.tools.representation.graph import get_adj_of_two_sent_in_ernie
-from ddparser.tools.representation.graph import transfor_head_id_for_ernie
+from tools.representation.graph import get_arcs_and_head_in_wordpiece
+from tools.representation.graph import pad_batch_graphs
+from tools.representation.graph import get_adj_of_one_sent_in_ernie
+from tools.representation.graph import get_adj_of_two_sent_in_ernie
+from tools.representation.graph import transfor_head_id_for_ernie
 
 
 class BaseReader(object):
@@ -44,8 +44,8 @@ class BaseReader(object):
                  for_cn=True,
                  task_id=0):
         self.max_seq_len = max_seq_len
-        self.tokenizer = tokenization.FullTokenizer(vocab_file=vocab_path,
-                                                    do_lower_case=do_lower_case)
+        self.tokenizer = tokenization.FullTokenizer(
+            vocab_file=vocab_path, do_lower_case=do_lower_case)
         self.vocab = self.tokenizer.vocab
         self.pad_id = self.vocab["[PAD]"]
         self.cls_id = self.vocab["[CLS]"]
@@ -108,7 +108,8 @@ class BaseReader(object):
         text_a = tokenization.convert_to_unicode(example.text_a)
         ddp_res_a = eval(example.ddp_res_a)
         tokens_a = tokenizer.tokenize(text_a)
-        dep_a, head_id_a = get_arcs_and_head_in_wordpiece(ddp_res_a, tokens_a)
+        # 获取句子a的弧及核心词索引
+        arcs_a, head_id_a = get_arcs_and_head_in_wordpiece(ddp_res_a, tokens_a)
         tokens_b = None
 
         has_text_b = False
@@ -121,7 +122,8 @@ class BaseReader(object):
             text_b = tokenization.convert_to_unicode(example.text_b)
             ddp_res_b = eval(example.ddp_res_b)
             tokens_b = tokenizer.tokenize(text_b)
-            dep_b, head_id_b = get_arcs_and_head_in_wordpiece(
+            # 获取句子b的弧及核心词索引
+            arcs_b, head_id_b = get_arcs_and_head_in_wordpiece(
                 ddp_res_b, tokens_b)
 
         if tokens_b:
@@ -129,9 +131,10 @@ class BaseReader(object):
             # length is less than the specified length.
             # Account for [CLS], [SEP], [SEP] with "- 3"
             self._truncate_seq_pair(tokens_a, tokens_b, max_seq_length - 3)
+            # 获取句子a和b组成的邻接矩阵
             adjacency_matrix = get_adj_of_two_sent_in_ernie(
-                dep_a, len(tokens_a), dep_b, len(tokens_b))
-
+                arcs_a, len(tokens_a), arcs_b, len(tokens_b))
+            # 获取映射后核心词索引
             head_ids = transfor_head_id_for_ernie(head_id_a, len(tokens_a),
                                                   head_id_b, len(tokens_b))
         else:
@@ -139,7 +142,7 @@ class BaseReader(object):
             if len(tokens_a) > max_seq_length - 2:
                 tokens_a = tokens_a[0:(max_seq_length - 2)]
             adjacency_matrix = get_adj_of_one_sent_in_ernie(
-                dep_a, len(tokens_a))
+                arcs_a, len(tokens_a))
             head_ids = transfor_head_id_for_ernie(head_id_a, len(tokens_a))
 
         # The convention in BERT/ERNIE is:
@@ -180,6 +183,7 @@ class BaseReader(object):
         token_ids = tokenizer.convert_tokens_to_ids(tokens)
         position_ids = list(range(len(token_ids)))
 
+        # 增加adjacency_matrix和head_ids特征
         if self.is_inference:
             Record = namedtuple('Record', [
                 'token_ids', 'text_type_ids', 'position_ids',
@@ -197,8 +201,8 @@ class BaseReader(object):
                 label_id = example.label
 
             Record = namedtuple('Record', [
-                'token_ids', 'text_type_ids', 'position_ids', 'label_id', 'qid',
-                'adjacency_matrix', 'head_ids'
+                'token_ids', 'text_type_ids', 'position_ids', 'label_id',
+                'qid', 'adjacency_matrix', 'head_ids'
             ])
 
             qid = None
@@ -294,13 +298,17 @@ class ClassifyReader(BaseReader):
 
     def _pad_batch_records(self, batch_records):
         batch_token_ids = [record.token_ids for record in batch_records]
-        batch_text_type_ids = [record.text_type_ids for record in batch_records]
+        batch_text_type_ids = [
+            record.text_type_ids for record in batch_records
+        ]
         batch_position_ids = [record.position_ids for record in batch_records]
+        # 增加batch_adjacency_matrix
         batch_adjacency_matrix = [
             record.adjacency_matrix for record in batch_records
         ]
-        batch_head_ids = np.array([record.head_ids
-                                   for record in batch_records]).astype("int64")
+        # 增加batch_head_ids
+        batch_head_ids = np.array(
+            [record.head_ids for record in batch_records]).astype("int64")
 
         if not self.is_inference:
             batch_labels = [record.label_id for record in batch_records]
@@ -308,8 +316,8 @@ class ClassifyReader(BaseReader):
                 batch_labels = np.array(batch_labels).astype("int64").reshape(
                     [-1, 1])
             elif self.is_regression:
-                batch_labels = np.array(batch_labels).astype("float32").reshape(
-                    [-1, 1])
+                batch_labels = np.array(batch_labels).astype(
+                    "float32").reshape([-1, 1])
 
             if batch_records[0].qid:
                 batch_qids = [record.qid for record in batch_records]
@@ -319,6 +327,7 @@ class ClassifyReader(BaseReader):
                 batch_qids = np.array([]).astype("int64").reshape([-1, 1])
 
         # padding
+        # 增加max_len=self.max_seq_len，将所有batch的长度都填充到最大长度
         padded_token_ids, input_mask = pad_batch_data(batch_token_ids,
                                                       max_len=self.max_seq_len,
                                                       pad_idx=self.pad_id,
@@ -343,6 +352,7 @@ class ClassifyReader(BaseReader):
         ]
         if not self.is_inference:
             return_list += [batch_labels, batch_qids]
+        # 增加padded_adjacency_matrix和batch_head_ids的返回
         return_list += [padded_adjacency_matrix, batch_head_ids]
 
         return return_list
@@ -351,7 +361,9 @@ class ClassifyReader(BaseReader):
 class SequenceLabelReader(BaseReader):
     def _pad_batch_records(self, batch_records):
         batch_token_ids = [record.token_ids for record in batch_records]
-        batch_text_type_ids = [record.text_type_ids for record in batch_records]
+        batch_text_type_ids = [
+            record.text_type_ids for record in batch_records
+        ]
         batch_position_ids = [record.position_ids for record in batch_records]
         batch_label_ids = [record.label_ids for record in batch_records]
 
@@ -427,7 +439,9 @@ class SequenceLabelReader(BaseReader):
 class ExtractEmbeddingReader(BaseReader):
     def _pad_batch_records(self, batch_records):
         batch_token_ids = [record.token_ids for record in batch_records]
-        batch_text_type_ids = [record.text_type_ids for record in batch_records]
+        batch_text_type_ids = [
+            record.text_type_ids for record in batch_records
+        ]
         batch_position_ids = [record.position_ids for record in batch_records]
 
         # padding
@@ -467,8 +481,8 @@ class MRCReader(BaseReader):
                  doc_stride=128,
                  max_query_length=64):
         self.max_seq_len = max_seq_len
-        self.tokenizer = tokenization.FullTokenizer(vocab_file=vocab_path,
-                                                    do_lower_case=do_lower_case)
+        self.tokenizer = tokenization.FullTokenizer(
+            vocab_file=vocab_path, do_lower_case=do_lower_case)
         self.vocab = self.tokenizer.vocab
         self.pad_id = self.vocab["[PAD]"]
         self.cls_id = self.vocab["[CLS]"]
@@ -534,7 +548,8 @@ class MRCReader(BaseReader):
 
                         Example = namedtuple('Example', [
                             'qas_id', 'question_text', 'doc_tokens',
-                            'orig_answer_text', 'start_position', 'end_position'
+                            'orig_answer_text', 'start_position',
+                            'end_position'
                         ])
 
                         example = Example(qas_id=qas_id,
@@ -714,7 +729,9 @@ class MRCReader(BaseReader):
 
     def _pad_batch_records(self, batch_records, is_training):
         batch_token_ids = [record.token_ids for record in batch_records]
-        batch_text_type_ids = [record.text_type_ids for record in batch_records]
+        batch_text_type_ids = [
+            record.text_type_ids for record in batch_records
+        ]
         batch_position_ids = [record.position_ids for record in batch_records]
         if is_training:
             batch_start_position = [
@@ -778,10 +795,8 @@ class MRCReader(BaseReader):
         features = self.features.get(phase, None)
         if not examples:
             examples = self._read_json(input_file, phase == "train")
-            features = self._convert_example_to_feature(examples,
-                                                        self.max_seq_len,
-                                                        self.tokenizer,
-                                                        phase == "train")
+            features = self._convert_example_to_feature(
+                examples, self.max_seq_len, self.tokenizer, phase == "train")
             self.examples[phase] = examples
             self.features[phase] = features
 

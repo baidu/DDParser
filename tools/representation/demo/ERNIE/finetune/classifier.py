@@ -26,8 +26,8 @@ import paddle.fluid as fluid
 
 from model.ernie import ErnieModel
 from ddparser.parser.nets import nn
-from ddparser.tools.representation import gnn
-from ddparser.tools.representation import utils
+from tools.representation import gnn
+from tools.representation import utils
 
 
 def create_model(args,
@@ -39,6 +39,7 @@ def create_model(args,
                  is_regression=False,
                  ernie_version="1.0"):
     if is_classify:
+        # 增加邻接矩阵和核心词的shape
         pyreader = fluid.layers.py_reader(
             capacity=50,
             shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
@@ -80,11 +81,16 @@ def create_model(args,
                        config=ernie_config,
                        use_fp16=args.use_fp16)
 
-    gat = gnn.GAT(768, 100, 200, 0.0, 0.1, 12, 2)
     erinie_output = ernie.get_sequence_output()
-    gat_emb = gat.forward(erinie_output, adj_mat)
-    gat_emb = utils.index_sample(gat_emb, head_ids)
     cls_feats = ernie.get_pooled_output()
+
+    # 增加GAT网络
+    gat = gnn.GAT(768, 100, 50, 0.0, 0.1, 12, 2)
+    # 将ernie的表示和邻接矩阵输入到gat网络中得到包含句子结构信息的表示
+    gat_emb = gat.forward(erinie_output, adj_mat)
+    # 提取核心词的表示
+    gat_emb = utils.index_sample(gat_emb, head_ids)
+    # 将[CLS]和核心词的表示拼接，供下游网络使用
     cls_feats = fluid.layers.concat([cls_feats, gat_emb], axis=1)
 
     cls_feats = fluid.layers.dropout(x=cls_feats,

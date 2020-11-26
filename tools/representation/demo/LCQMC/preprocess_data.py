@@ -20,7 +20,7 @@ import sys
 import json
 import pickle
 sys.path.append("..")
-sys.path.append("../../../../../")
+sys.path.append("../../../..")
 from ERNIE.tokenization import BasicTokenizer
 
 import pandas as pd
@@ -29,7 +29,7 @@ from ddparser import DDParser
 TRAIN_PATH = 'train.csv'
 DEV_PATH = 'dev.csv'
 TEST_PATH = 'test.csv'
-use_cuda = False
+use_cuda = True
 
 if __name__ == "__main__":
     file_paths = [TRAIN_PATH, DEV_PATH, TEST_PATH]

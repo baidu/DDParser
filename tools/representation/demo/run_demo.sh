@@ -2,7 +2,7 @@ set -eux
 
 export FLAGS_eager_delete_tensor_gb=0
 export FLAGS_sync_nccl_allreduce=1
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=5
 
 MODEL_PATH="ernie1.0base"
 TASK_DATA_PATH="LCQMC"
