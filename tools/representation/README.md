@@ -1,7 +1,7 @@
 ## 基于依存分析树和GAT的句子表示工具
-最近几年图神经网络(GNN)越来越多被应用到NLP任务，而DDParser可以输出句子的依存句法分析树，由于树是图的一种特例，那么很自然的可以将GNN应用在依存句法分析的句子表示上。<br>
+最近几年图神经网络(GNN)越来越多被应用到NLP任务，而DDParser可以输出句子的依存句法分析树，由于树是图的一种特例，那么很自然的可以将GNN基于依存句法分析结果应用到句子表示上。<br>
 ### 实现原理
-本工具提出一种方法可以快速将依存句法分析特征应用到下游网络。
+本工具提出一种可以快速将依存句法分析特征应用到下游网络的方法。
 * 第一步，利用DDParser对用户原始数据处理，得到依存句法分析结果。
 * 第二步，修改原始模型的Dataloader，利用本工具提供的接口得到文本的邻接矩阵<img src="https://latex.codecogs.com/svg.latex?\mathrm{A}">和核心词索引<img src="https://latex.codecogs.com/svg.latex?\mathrm{h}">。
 * 第三步，在模型得到句子的表示<img src="https://latex.codecogs.com/svg.latex?\mathrm{X}">后，修改模型结构引入图注意力网络([Graph Attention Networks, GAT](https://arxiv.org/abs/1710.10903))，将<img src="https://latex.codecogs.com/svg.latex?\mathrm{A}">和<img src="https://latex.codecogs.com/svg.latex?\mathrm{X}">作为GAT网络输入得到包含句子结构信息的句子表示<img src="https://latex.codecogs.com/svg.latex?\bar{X}">。 
