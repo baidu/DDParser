@@ -15,12 +15,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #################################################################################
+from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import division
+
 import sys
 import os
 import datetime
 import logging
 import math
-import pickle
+import six
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import LAC
@@ -67,15 +72,15 @@ def train(env):
     dev.loader = batchify(dev, args.batch_size)
     test.loader = batchify(test, args.batch_size)
 
-    logging.info(f"{'train:':6} {len(train):5} sentences, "
-                 f"{len(train.loader):3} batches, "
-                 f"{len(train.buckets)} buckets")
-    logging.info(f"{'dev:':6} {len(dev):5} sentences, "
-                 f"{len(dev.loader):3} batches, "
-                 f"{len(train.buckets)} buckets")
-    logging.info(f"{'test:':6} {len(test):5} sentences, "
-                 f"{len(test.loader):3} batches, "
-                 f"{len(train.buckets)} buckets")
+    logging.info("{:6} {:5} sentences, ".format('train:', len(train)) +
+                 "{:3} batches, ".format(len(train.loader)) +
+                 "{} buckets".format(len(train.buckets)))
+    logging.info("{:6} {:5} sentences, ".format('dev:', len(dev)) +
+                 "{:3} batches, ".format(len(dev.loader)) +
+                 "{} buckets".format(len(dev.buckets)))
+    logging.info("{:6} {:5} sentences, ".format('test:', len(test)) +
+                 "{:3} batches, ".format(len(test.loader)) +
+                 "{} buckets".format(len(test.buckets)))
 
     logging.info("Create the model")
     model = Model(args, env.WORD.embed)
@@ -108,35 +113,38 @@ def train(env):
     for epoch in range(1, args.epochs + 1):
         start = datetime.datetime.now()
         # train one epoch and update the parameter
-        logging.info(f"Epoch {epoch} / {args.epochs}:")
+        logging.info("Epoch {} / {}:".format(epoch, args.epochs))
         epoch_train(args, model, optimizer, train.loader, epoch)
         if args.local_rank == 0:
             loss, dev_metric = epoch_evaluate(args, model, dev.loader, puncts)
-            logging.info(f"{'dev:':6} Loss: {loss:.4f} {dev_metric}")
+            logging.info("{:6} Loss: {:.4f} {}".format('dev:', loss,
+                                                       dev_metric))
             loss, test_metric = epoch_evaluate(args, model, test.loader,
                                                puncts)
-            logging.info(f"{'test:':6} Loss: {loss:.4f} {test_metric}")
+            logging.info("{:6} Loss: {:.4f} {}".format('test:', loss,
+                                                       test_metric))
 
             t = datetime.datetime.now() - start
             # save the model if it is the best so far
             if dev_metric > best_metric and epoch > args.patience // 10:
                 best_e, best_metric = epoch, dev_metric
                 save(args.model_path, args, model, optimizer)
-                logging.info(f"{t}s elapsed (saved)\n")
+                logging.info("{}s elapsed (saved)\n".format(t))
             else:
-                logging.info(f"{t}s elapsed\n")
+                logging.info("{}s elapsed\n".format(t))
             total_time += t
             if epoch - best_e >= args.patience:
                 break
     if args.local_rank == 0:
         model = load(args.model_path, model)
         loss, metric = epoch_evaluate(args, model, test.loader, puncts)
-        logging.info(
-            f"max score of dev is {best_metric.score:.2%} at epoch {best_e}")
-        logging.info(
-            f"the score of test at epoch {best_e} is {metric.score:.2%}")
-        logging.info(f"average time of each epoch is {total_time / epoch}s")
-        logging.info(f"{total_time}s elapsed")
+        logging.info("max score of dev is {:.2%} at epoch {}".format(
+            best_metric.score, best_e))
+        logging.info("the score of test at epoch {} is {:.2%}".format(
+            best_e, metric.score))
+        logging.info("average time of each epoch is {}s".format(total_time /
+                                                                epoch))
+        logging.info("{}s elapsed".format(total_time))
 
 
 def evaluate(env):
@@ -150,9 +158,9 @@ def evaluate(env):
     # set the data loader
     dataset.loader = batchify(dataset, args.batch_size)
 
-    logging.info(f"{len(dataset)} sentences, "
-                 f"{len(dataset.loader)} batches, "
-                 f"{len(dataset.buckets)} buckets")
+    logging.info("{} sentences, ".format(len(dataset)) +
+                 "{} batches, ".format(len(dataset.loader)) +
+                 "{} buckets".format(len(dataset.buckets)))
     logging.info("Load the model")
     model = load(args.model_path)
 
@@ -160,9 +168,10 @@ def evaluate(env):
     start = datetime.datetime.now()
     loss, metric = epoch_evaluate(args, model, dataset.loader, puncts)
     total_time = datetime.datetime.now() - start
-    logging.info(f"Loss: {loss:.4f} {metric}")
-    logging.info(f"{total_time}s elapsed, "
-                 f"{len(dataset) / total_time.total_seconds():.2f} Sents/s")
+    logging.info("Loss: {:.4f} {}".format(loss, metric))
+    logging.info("{}s elapsed, {:.2f} Sents/s".format(
+        total_time,
+        len(dataset) / total_time.total_seconds()))
 
 
 def predict(env):
@@ -176,8 +185,8 @@ def predict(env):
     dataset = TextDataset(predicts, [env.WORD, env.FEAT], args.buckets)
     # set the data loader
     dataset.loader = batchify(dataset, args.batch_size)
-    logging.info(f"{len(dataset)} sentences, "
-                 f"{len(dataset.loader)} batches")
+    logging.info("{} sentences, {} batches".format(len(dataset),
+                                                   len(dataset.loader)))
 
     logging.info("Load the model")
     model = load(args.model_path)
@@ -196,10 +205,12 @@ def predict(env):
     predicts.deprel = [pred_rels[i] for i in indices]
     if args.prob:
         predicts.prob = [pred_probs[i] for i in indices]
-    logging.info(f"Save the predicted result to {args.infer_result_path}")
+    logging.info("Save the predicted result to {}".format(
+        args.infer_result_path))
     predicts.save(args.infer_result_path)
-    logging.info(f"{total_time}s elapsed, "
-                 f"{len(dataset) / total_time.total_seconds():.2f} Sents/s")
+    logging.info("{}s elapsed, {:.2f} Sents/s".format(
+        total_time,
+        len(dataset) / total_time.total_seconds()))
 
 
 def predict_query(env):
@@ -236,12 +247,12 @@ def predict_query(env):
         predicts.deprel = pred_rels
         if args.prob:
             predicts.prob = pred_probs
-        predicts.print()
+        predicts._print()
         total_time = datetime.datetime.now() - start
-        logging.info(
-            f"{total_time}s elapsed, "
-            f"{len(dataset) / total_time.total_seconds():.2f} Sents/s, {total_time.total_seconds() / len(dataset) * 1000:.2f} ms/Sents"
-        )
+        logging.info("{}s elapsed, {:.2f} Sents/s, {:.2f} ms/Sents".format(
+            total_time,
+            len(dataset) / total_time.total_seconds(),
+            total_time.total_seconds() / len(dataset) * 1000))
 
 
 class DDParser(object):
@@ -274,7 +285,7 @@ class DDParser(object):
                 model_files_path = self._get_abs_path(
                     './model_files/transformer')
             else:
-                raise "Unknown encoding model."
+                raise KeyError("Unknown encoding model.")
 
             if not os.path.exists(model_files_path):
                 try:
@@ -282,12 +293,12 @@ class DDParser(object):
                                                   encoding_model)
                 except Exception as e:
                     logging.error("Failed to download model, please try again")
-                    logging.error(f"error: {e}")
+                    logging.error("error: {}".format(e))
                     raise e
 
         args = [
-            f"--model_files={model_files_path}",
-            f"--config_path={self._get_abs_path('config.ini')}"
+            "--model_files={}".format(model_files_path),
+            "--config_path={}".format(self._get_abs_path('config.ini'))
         ]
 
         if use_cuda:
@@ -297,7 +308,7 @@ class DDParser(object):
         if prob:
             args.append("--prob")
         if batch_size:
-            args.append(f"--batch_size={batch_size}")
+            args.append("--batch_size={}", format(batch_size))
 
         args = ArgConfig(args)
         # Don't instantiate the log handle
@@ -352,11 +363,20 @@ class DDParser(object):
                                use_cuda=self.args.use_cuda)
         if not inputs:
             return
-        if isinstance(inputs, str):
+        if isinstance(inputs, six.string_types):
             inputs = [inputs]
-        if all([isinstance(i, str) and i for i in inputs]):
+        if all([isinstance(i, six.string_types) and i for i in inputs]):
             lac_results = []
             position = 0
+            try:
+                inputs = [
+                    query if isinstance(query, six.text_type) else
+                    query.decode("utf-8") for query in inputs
+                ]
+            except UnicodeDecodeError:
+                logging.warning("encoding only supports UTF-8!")
+                return
+
             while position < len(inputs):
                 lac_results += self.lac.run(inputs[position:position +
                                                    self.args.batch_size])
@@ -392,7 +412,7 @@ class DDParser(object):
         outputs = predicts.get_result()
         return outputs
 
-    def parse_seg(self, inputs: list):
+    def parse_seg(self, inputs):
         """
         预测已切词的句子。
 
@@ -462,12 +482,12 @@ if __name__ == '__main__':
     args = ArgConfig()
     logging.info("init environment.")
     env = Environment(args)
-    logging.info(f"Override the default configs\n{env.args}")
-    logging.info(f"{env.WORD}\n{env.FEAT}\n{env.ARC}\n{env.REL}")
-    logging.info(f"Set the max num of threads to {env.args.threads}")
-    logging.info(
-        f"Set the seed for generating random numbers to {env.args.seed}")
-    logging.info(f"Run the subcommand in mode {env.args.mode}")
+    logging.info("Override the default configs\n{}".format(env.args))
+    logging.info("{}\n{}\n{}\n{}".format(env.WORD, env.FEAT, env.ARC, env.REL))
+    logging.info("Set the max num of threads to {}".format(env.args.threads))
+    logging.info("Set the seed for generating random numbers to {}".format(
+        env.args.seed))
+    logging.info("Run the subcommand in mode {}".format(env.args.mode))
 
     fluid.enable_imperative(env.place)
     mode = env.args.mode
@@ -480,4 +500,4 @@ if __name__ == '__main__':
     elif mode == "predict_q":
         predict_query(env)
     else:
-        logging.error(f"Unknown task mode: {mode}.")
+        logging.error("Unknown task mode: {}.".format(mode))

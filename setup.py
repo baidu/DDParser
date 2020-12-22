@@ -21,7 +21,7 @@ Setup script.
 Authors: zhangshuai28(zhangshuai28@baidu.com)
 Date:    2020/06/22 11:48:37
 """
-
+from io import open
 import pkg_resources
 import setuptools
 from setuptools import setup
@@ -55,7 +55,7 @@ with open("README.md", "r", encoding='utf8') as fh:
     long_description = fh.read()
 setup(
     name="ddparser",
-    version="0.1.2",
+    version="0.1.4",
     author="Baidu NLP",
     author_email="nlp-parser@baidu.com",
     description="A chinese dependency parser tool by Baidu NLP.",

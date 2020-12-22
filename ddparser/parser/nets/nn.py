@@ -47,11 +47,11 @@ def pad_sequence_paddle(sequences, padding_value=0):
     out_tensor = []
     for tensor in sequences:
         length = tensor.shape[0]
-        pad_tensor = layers.concat((tensor,
-                                    layers.fill_constant(
-                                        (max_len - length, *trailing_dims),
-                                        dtype=tensor.dtype,
-                                        value=padding_value)))
+        pad_tensor = layers.concat(
+            (tensor,
+             layers.fill_constant([max_len - length] + trailing_dims,
+                                  dtype=tensor.dtype,
+                                  value=padding_value)))
         out_tensor.append(pad_tensor)
     out_tensor = layers.stack(out_tensor)
     return out_tensor
@@ -130,8 +130,8 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
     m = strides[0] + strides[1]
     k = strides[1] if dim == 1 else strides[0]
     return np.lib.stride_tricks.as_strided(x[offset[0]:, offset[1]:],
-                                           shape=(n, w, *x.shape[2:]),
-                                           strides=(m, k, *strides[2:]))
+                                           shape=[n, w] + list(x.shape[2:]),
+                                           strides=[m, k] + list(strides[2:]))
 
 
 def masked_select(input, mask):
@@ -189,7 +189,7 @@ def index_sample(x, index):
     x_s = x.shape
     dim = len(index.shape) - 1
     assert x_s[:dim] == index.shape[:dim]
-    r_x = layers.reshape(x, shape=(-1, *x_s[dim:]))
+    r_x = layers.reshape(x, shape=[-1] + x_s[dim:])
     index = layers.reshape(index, shape=(len(r_x), -1, 1))
     # generate arange index, shape like index
     arr_index = layers.arange(start=0, end=len(index), dtype=index.dtype)
@@ -200,7 +200,7 @@ def index_sample(x, index):
     new_index = layers.reshape(new_index, (-1, 2))
     # get output
     out = layers.gather_nd(r_x, new_index)
-    out = layers.reshape(out, (*x_s[:dim], -1))
+    out = layers.reshape(out, x_s[:dim] + [-1])
     return out
 
 

@@ -23,7 +23,6 @@ import ast
 import argparse
 import configparser
 import logging
-
 import os
 import math
 import pickle
@@ -170,9 +169,9 @@ class ArgConfig(configparser.ConfigParser):
     def __repr__(self):
         """repr"""
         s = line = "-" * 25 + "-+-" + "-" * 25 + "\n"
-        s += f"{'Param':25} | {'Value':^25}\n" + line
+        s += "{:25} | {:^25}\n".format('Param', 'Value') + line
         for name, value in vars(self.namespace).items():
-            s += f"{name:25} | {str(value):^25}\n"
+            s += "{:25} | {:^25}\n".format(name, str(value))
         s += line
 
         return s
@@ -223,7 +222,8 @@ class Environment(object):
             self.place = fluid.CPUPlace()
 
         os.environ['FLAGS_paddle_num_threads'] = str(self.args.threads)
-        os.makedirs(self.args.model_files, exist_ok=True)
+        if not os.path.exists(self.args.model_files):
+            os.makedirs(self.args.model_files)
 
         if not os.path.exists(self.args.fields_path) or self.args.preprocess:
             logging.info("Preprocess the data")

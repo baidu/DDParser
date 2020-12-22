@@ -20,7 +20,10 @@
 """
 
 import math
-from collections.abc import Iterable
+try:
+    from collections.abc import Iterable
+except:
+    from collections import Iterable
 from itertools import chain
 
 import numpy as np
@@ -126,7 +129,7 @@ class BucketsSampler(object):
         self.chunks = []
         for size, bucket in zip(self.sizes, self.buckets):
             max_ch = max(math.ceil(size * len(bucket) / batch_size), 1)
-            chunk = min(len(bucket), max_ch)
+            chunk = min(len(bucket), int(max_ch))
             self.chunks.append(chunk)
 
     def __iter__(self):

@@ -18,6 +18,10 @@
 """
 本文件定义了使用到的工具类和函数
 """
+from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import division
 
 import copy
 import logging
@@ -28,7 +32,10 @@ import shutil
 import ssl
 import tarfile
 import unicodedata
-from urllib.request import urlopen
+try:
+    from urllib.request import urlopen
+except ImportError:
+    from urllib2 import urlopen
 
 import numpy as np
 from tqdm import tqdm
@@ -41,9 +48,9 @@ bos = '<bos>'
 
 DOWNLOAD_MODEL_PATH_DICT = {
     'lstm':
-    "https://ddparser.bj.bcebos.com/DDParser-char-lstm-0.1.2.tar.gz",
+    "https://ddparser.bj.bcebos.com/DDParser-char-lstm-0.1.4.tar.gz",
     "transformer":
-    "https://ddparser.bj.bcebos.com/DDParser-char-transformer-0.1.2.tar.gz"
+    "https://ddparser.bj.bcebos.com/DDParser-char-transformer-0.1.4.tar.gz"
 }
 
 
@@ -205,10 +212,10 @@ class DepTree:
         for node in self.nodes[1:]:
             self.add(self.nodes[node.parent], node)
 
-    def add(self, parent: NODE, child: NODE):
+    def add(self, parent, child):
         """Add a child node"""
         if parent.id is None or child.id is None:
-            raise f"id is None"
+            raise Exception("id is None")
         if parent.id < child.id:
             parent.rights = sorted(parent.rights + [child.id])
         else:

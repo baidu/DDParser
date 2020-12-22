@@ -36,7 +36,7 @@ class Metric(object):
 
     def __repr__(self):
         """repr"""
-        return f"UAS: {self.uas:6.2%} LAS: {self.las:6.2%}"
+        return "UAS: {:6.2%} LAS: {:6.2%}".format(self.uas, self.las)
 
     def __call__(self, arc_preds, rel_preds, arc_golds, rel_golds, mask):
         """call"""

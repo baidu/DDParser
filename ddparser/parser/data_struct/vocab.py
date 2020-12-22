@@ -18,8 +18,13 @@
 """
 本文件定义Vocab类
 """
+
 from collections import defaultdict
-from collections.abc import Iterable
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
+import six
 
 
 class Vocab(object):
@@ -39,11 +44,11 @@ class Vocab(object):
 
     def __getitem__(self, key):
         """According to the key or index, return the index and key"""
-        if isinstance(key, str):
+        if isinstance(key, six.string_types):
             return self.stoi[key]
         elif not isinstance(key, Iterable):
             return self.itos[key]
-        elif isinstance(key[0], str):
+        elif isinstance(key[0], six.string_types):
             return [self.stoi[i] for i in key]
         else:
             return [self.itos[i] for i in key]

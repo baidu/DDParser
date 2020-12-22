@@ -38,7 +38,7 @@ class RawField(object):
 
     def __repr__(self):
         """repr"""
-        return f"({self.name}): {self.__class__.__name__}()"
+        return "({}): {}()".format(self.name, self.__class__.__name__)
 
     def preprocess(self, sequence):
         """preprocess"""
@@ -77,17 +77,17 @@ class Field(RawField):
 
     def __repr__(self):
         """repr"""
-        s, params = f"({self.name}): {self.__class__.__name__}(", []
+        s, params = "({}): {}(".format(self.name, self.__class__.__name__), []
         if self.pad is not None:
-            params.append(f"pad={self.pad}")
+            params.append("pad={}".format(self.pad))
         if self.unk is not None:
-            params.append(f"unk={self.unk}")
+            params.append("unk={}".format(self.unk))
         if self.bos is not None:
-            params.append(f"bos={self.bos}")
+            params.append("bos={}".format(self.bos))
         if self.lower:
-            params.append(f"lower={self.lower}")
+            params.append("lower={}".format(self.lower))
         if not self.use_vocab:
-            params.append(f"use_vocab={self.use_vocab}")
+            params.append("use_vocab={}".format(self.use_vocab))
         s += ", ".join(params)
         s += ")"
 
@@ -125,7 +125,7 @@ class Field(RawField):
         if self.tokenize is not None:
             sequence = self.tokenize(sequence)
         if self.lower:
-            sequence = [str.lower(token) for token in sequence]
+            sequence = [token.lower() for token in sequence]
 
         return sequence
 

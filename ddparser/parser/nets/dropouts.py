@@ -30,7 +30,6 @@ class SharedDropout(dygraph.Layer):
         self.p = p
         self.batch_first = batch_first
 
-
     def forward(self, x):
         """Forward network"""
         if self.training and self.p > 0:
@@ -57,10 +56,6 @@ class IndependentDropout(dygraph.Layer):
         super(IndependentDropout, self).__init__()
 
         self.p = p
-
-    def __repr__(self):
-        """repr"""
-        return f"p={self.p}"
 
     def forward(self, *items):
         """Forward network"""

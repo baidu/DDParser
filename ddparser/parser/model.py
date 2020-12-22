@@ -22,8 +22,12 @@
 import logging
 import math
 import os
-import pickle
 import time
+import six
+try:
+    import cPickle as pickle  #python 2
+except ImportError as e:
+    import pickle  #python 3
 
 import numpy as np
 from paddle import fluid
@@ -31,6 +35,7 @@ from paddle.fluid import dygraph
 from paddle.fluid import initializer
 from paddle.fluid import layers
 
+from ddparser.parser.config import ArgConfig
 from ddparser.parser.data_struct import utils
 from ddparser.parser.data_struct import Embedding
 from ddparser.parser.data_struct import Metric
@@ -200,8 +205,9 @@ def epoch_train(args, model, optimizer, loader, epoch):
 
         total_loss += loss.numpy().item()
         logging.info(
-            f"epoch: {epoch}, batch: {batch}/{math.ceil(len(loader) / args.nranks)}, batch_size: {len(words)}, loss: {loss.numpy().item():.4f}"
-        )
+            "epoch: {}, batch: {}/{}, batch_size: {}, loss: {:.4f}".format(
+                epoch, batch, math.ceil(len(loader) / args.nranks), len(words),
+                loss.numpy().item()))
     total_loss /= len(loader)
     return total_loss
 
@@ -221,15 +227,16 @@ def epoch_evaluate(args, model, loader, puncts):
         mask = tmp_words != args.pad_index
 
         s_arc, s_rel = model(words, feats)
+
         loss = loss_function(s_arc, s_rel, arcs, rels, mask)
         arc_preds, rel_preds = decode(args, s_arc, s_rel, mask)
         # ignore all punctuation if not specified
         if not args.punct:
             punct_mask = layers.reduce_all(
                 layers.expand(layers.unsqueeze(words, -1),
-                              (1, 1, puncts.shape[0])) != layers.expand(
-                                  layers.reshape(puncts, (1, 1, -1)),
-                                  (*words.shape, 1)),
+                              (1, 1, puncts.shape[0])) !=
+                layers.expand(layers.reshape(puncts,
+                                             (1, 1, -1)), words.shape + [1]),
                 dim=-1)
             mask = layers.logical_and(mask, punct_mask)
 
@@ -311,14 +318,15 @@ def save(path, args, model, optimizer):
     fluid.save_dygraph(model.state_dict(), path)
     fluid.save_dygraph(optimizer.state_dict(), path)
     with open(path + ".args", "wb") as f:
-        pickle.dump(args, f)
+        pickle.dump(args.namespace, f, protocol=2)
 
 
 def load(path, model=None):
     """Loading model"""
     if model is None:
         with open(path + ".args", "rb") as f:
-            args = pickle.load(f)
+            args = ArgConfig()
+            args.namespace = pickle.load(f)
         model = Model(args)
     model_state, _ = fluid.load_dygraph(path)
     model.set_dict(model_state)
