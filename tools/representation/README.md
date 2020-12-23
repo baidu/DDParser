@@ -7,9 +7,9 @@
 * 第三步，在模型得到句子的表示<img src="https://latex.codecogs.com/svg.latex?\mathrm{X}">后，修改模型结构引入图注意力网络([Graph Attention Networks, GAT](https://arxiv.org/abs/1710.10903))，将<img src="https://latex.codecogs.com/svg.latex?\mathrm{A}">和<img src="https://latex.codecogs.com/svg.latex?\mathrm{X}">作为GAT网络输入得到包含句子结构信息的句子表示<img src="https://latex.codecogs.com/svg.latex?\bar{X}">。 
 * 第四步，对<img src="https://latex.codecogs.com/svg.latex?\bar{X}">应用可分为两种方式。
   - 1.将<img src="https://latex.codecogs.com/svg.latex?\bar{X}">和<img src="https://latex.codecogs.com/svg.latex?\mathrm{X}">拼接后应用到下游网络。
-  - 2.通过<img src="https://latex.codecogs.com/svg.latex?\mathrm{h}">获取句子核心词表示，将核心词的表示应用到下游网络。
+  - 2.通过<img src="https://latex.codecogs.com/svg.latex?\mathrm{h}">获取句子核心词表示，将核心词的表示视作句子的表示应用到下游网络。
 
-经过实验，发现本工具可以有效提升相似度、事件抽取等任务效果。
+经过实验，发现本工具可以有效提升相似度匹配、事件抽取等任务效果。
 
 ### 示例
 为了方便用户快速使用本工具，我们基于ERNIE1.0模型和LCQMC数据集提供了一个示例。
