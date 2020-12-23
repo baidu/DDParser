@@ -9,7 +9,7 @@
   - 1.将<img src="https://latex.codecogs.com/svg.latex?\bar{X}">和<img src="https://latex.codecogs.com/svg.latex?\mathrm{X}">拼接后应用到下游网络。
   - 2.通过<img src="https://latex.codecogs.com/svg.latex?\mathrm{h}">获取句子核心词表示，将核心词的表示视作句子的表示应用到下游网络。
 
-经过实验，发现本工具可以有效提升相似度匹配、事件抽取等任务效果。
+经过实验发现，本工具可以有效提升相似度匹配、事件抽取等任务效果。
 
 ### 示例
 为了方便用户快速使用本工具，我们基于ERNIE1.0模型和LCQMC数据集提供了一个示例。
