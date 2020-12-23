@@ -104,6 +104,7 @@ class FineGrainedInfo(Tree):
         for cid in node.lefts + node.rights:
             cnode = self.nodes[cid]
             if flag and cnode.deprel == 'POB' and cnode.word in ['把', '被']:
+                ss = []
                 break
             if cnode.deprel == 'DBL':
                 return []
@@ -390,6 +391,7 @@ class CoarseGrainedInfo(Tree):
         for cid in node.lefts + node.rights:
             cnode = self.nodes[cid]
             if flag and cnode.deprel == 'POB' and cnode.word in ['把', '被']:
+                ss = []
                 break
             if cnode.deprel == 'DBL':
                 return []
