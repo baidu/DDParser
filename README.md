@@ -1,7 +1,7 @@
 # DDParser
  - 应用工具
-   - [基于依存分析树和GAT的句子表示工具](./tools/representation)
-   - [结构化信息抽取工具](./tools/struct_info)
+   - [基于句法分析的句子表示工具](./tools/representation)
+   - [基于句法分析的结构抽取工具](./tools/struct_info)
  - DDParser
    - [依存句法分析简介](#依存句法分析简介)
    - [项目介绍](#项目介绍)
