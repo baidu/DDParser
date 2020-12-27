@@ -175,7 +175,9 @@ class FineGrainedInfo(Tree):
 
         for cid in node.lefts + node.rights:
             cnode = self.nodes[cid]
-            if cnode.deprel == 'ADV':
+            if cnode.deprel == 'ADV' and (
+                    not cnode.rights
+                    or self.nodes[cnode.rights[0]].deprel != 'POB'):
                 advs.append(cnode.word)
                 for coo_word in self.process_coo(cnode):
                     advs.append(coo_word)
@@ -239,7 +241,11 @@ class FineGrainedInfo(Tree):
         if bb_flag or node.deprel != 'POB':
             return []
         parent = self.nodes[node.parent]
-        return [((parent.word, node.word), "POB")]
+        if parent.parent != -1:
+            grandparent = self.nodes[parent.parent]
+            return [((node.word, grandparent.word), "ADV_V")]
+        else:
+            return [((parent.word, node.word), "POB")]
 
     def process_coo(self, node):
         """处理COO标签"""
@@ -460,7 +466,9 @@ class CoarseGrainedInfo(Tree):
 
         for cid in node.lefts + node.rights:
             cnode = self.nodes[cid]
-            if cnode.deprel == 'ADV':
+            if cnode.deprel == 'ADV' and (
+                    not cnode.rights
+                    or self.nodes[cnode.rights[0]].deprel != 'POB'):
                 advs.append(self.process_sub_term(cnode))
                 for coo_word in self.process_coo(cnode):
                     advs.append(coo_word)
@@ -536,7 +544,11 @@ class CoarseGrainedInfo(Tree):
         if bb_flag or node.deprel != 'POB':
             return []
         parent = self.nodes[node.parent]
-        return [((parent.word, node.word), "POB")]
+        if parent.parent != -1:
+            grandparent = self.nodes[parent.parent]
+            return [((node.word, grandparent.word), "ADV_V")]
+        else:
+            return [((parent.word, node.word), "POB")]
 
     def process_coo(self, node):
         """处理COO标签"""
