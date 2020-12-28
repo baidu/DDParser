@@ -245,7 +245,7 @@ class FineGrainedInfo(Tree):
             grandparent = self.nodes[parent.parent]
             return [((node.word, grandparent.word), "ADV_V")]
         else:
-            return [((parent.word, node.word), "POB")]
+            return [((node.word, ), "Phrase")]
 
     def process_coo(self, node):
         """处理COO标签"""
@@ -548,7 +548,7 @@ class CoarseGrainedInfo(Tree):
             grandparent = self.nodes[parent.parent]
             return [((node.word, grandparent.word), "ADV_V")]
         else:
-            return [((parent.word, node.word), "POB")]
+            return [((node.word, ), "Phrase")]
 
     def process_coo(self, node):
         """处理COO标签"""
