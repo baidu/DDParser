@@ -6,8 +6,8 @@
 
 ```python
 >>> from ddparser import DDParser
->>> from process import FineGrainedInfo
->>> from process import CoarseGrainedInfo
+>>> from extract import FineGrainedInfo
+>>> from extract import CoarseGrainedInfo
 >>> ddp = DDParser(encoding_model='transformer')
 >>> text = ["百度是一家高科技公司"]
 >>> ddp_res = ddp.parse(text)
