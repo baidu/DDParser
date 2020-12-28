@@ -44,8 +44,7 @@ class BaseReader(object):
                  for_cn=True,
                  task_id=0):
         self.max_seq_len = max_seq_len
-        self.tokenizer = tokenization.FullTokenizer(
-            vocab_file=vocab_path, do_lower_case=do_lower_case)
+        self.tokenizer = tokenization.FullTokenizer(vocab_file=vocab_path, do_lower_case=do_lower_case)
         self.vocab = self.tokenizer.vocab
         self.pad_id = self.vocab["[PAD]"]
         self.cls_id = self.vocab["[CLS]"]
@@ -123,8 +122,7 @@ class BaseReader(object):
             ddp_res_b = eval(example.ddp_res_b)
             tokens_b = tokenizer.tokenize(text_b)
             # 获取句子b的弧及核心词索引
-            arcs_b, head_id_b = get_arcs_and_head_in_wordpiece(
-                ddp_res_b, tokens_b)
+            arcs_b, head_id_b = get_arcs_and_head_in_wordpiece(ddp_res_b, tokens_b)
 
         if tokens_b:
             # Modifies `tokens_a` and `tokens_b` in place so that the total
@@ -132,17 +130,14 @@ class BaseReader(object):
             # Account for [CLS], [SEP], [SEP] with "- 3"
             self._truncate_seq_pair(tokens_a, tokens_b, max_seq_length - 3)
             # 获取句子a和b组成的邻接矩阵
-            adjacency_matrix = get_adj_of_two_sent_in_ernie(
-                arcs_a, len(tokens_a), arcs_b, len(tokens_b))
+            adjacency_matrix = get_adj_of_two_sent_in_ernie(arcs_a, len(tokens_a), arcs_b, len(tokens_b))
             # 获取映射后核心词索引
-            head_ids = transfor_head_id_for_ernie(head_id_a, len(tokens_a),
-                                                  head_id_b, len(tokens_b))
+            head_ids = transfor_head_id_for_ernie(head_id_a, len(tokens_a), head_id_b, len(tokens_b))
         else:
             # Account for [CLS] and [SEP] with "- 2"
             if len(tokens_a) > max_seq_length - 2:
                 tokens_a = tokens_a[0:(max_seq_length - 2)]
-            adjacency_matrix = get_adj_of_one_sent_in_ernie(
-                arcs_a, len(tokens_a))
+            adjacency_matrix = get_adj_of_one_sent_in_ernie(arcs_a, len(tokens_a))
             head_ids = transfor_head_id_for_ernie(head_id_a, len(tokens_a))
 
         # The convention in BERT/ERNIE is:
@@ -185,10 +180,8 @@ class BaseReader(object):
 
         # 增加adjacency_matrix和head_ids特征
         if self.is_inference:
-            Record = namedtuple('Record', [
-                'token_ids', 'text_type_ids', 'position_ids',
-                'adjacency_matrix', 'head_ids'
-            ])
+            Record = namedtuple('Record',
+                                ['token_ids', 'text_type_ids', 'position_ids', 'adjacency_matrix', 'head_ids'])
             record = Record(token_ids=token_ids,
                             text_type_ids=text_type_ids,
                             position_ids=position_ids,
@@ -200,10 +193,9 @@ class BaseReader(object):
             else:
                 label_id = example.label
 
-            Record = namedtuple('Record', [
-                'token_ids', 'text_type_ids', 'position_ids', 'label_id',
-                'qid', 'adjacency_matrix', 'head_ids'
-            ])
+            Record = namedtuple(
+                'Record',
+                ['token_ids', 'text_type_ids', 'position_ids', 'label_id', 'qid', 'adjacency_matrix', 'head_ids'])
 
             qid = None
             if "qid" in example._fields:
@@ -224,8 +216,7 @@ class BaseReader(object):
         for index, example in enumerate(examples):
             if phase == "train":
                 self.current_example = index
-            record = self._convert_example_to_record(example, self.max_seq_len,
-                                                     self.tokenizer)
+            record = self._convert_example_to_record(example, self.max_seq_len, self.tokenizer)
             max_len = max(max_len, len(record.token_ids))
             if self.in_tokens:
                 to_append = (len(batch_records) + 1) * max_len <= batch_size
@@ -244,13 +235,7 @@ class BaseReader(object):
         examples = self._read_tsv(input_file)
         return len(examples)
 
-    def data_generator(self,
-                       input_file,
-                       batch_size,
-                       epoch,
-                       dev_count=1,
-                       shuffle=True,
-                       phase=None):
+    def data_generator(self, input_file, batch_size, epoch, dev_count=1, shuffle=True, phase=None):
         examples = self._read_tsv(input_file)
 
         def wrapper():
@@ -262,9 +247,7 @@ class BaseReader(object):
                 if shuffle:
                     np.random.shuffle(examples)
 
-                for batch_data in self._prepare_batch_data(examples,
-                                                           batch_size,
-                                                           phase=phase):
+                for batch_data in self._prepare_batch_data(examples, batch_size, phase=phase):
                     if len(all_dev_batches) < dev_count:
                         all_dev_batches.append(batch_data)
                     if len(all_dev_batches) == dev_count:
@@ -280,9 +263,7 @@ class ClassifyReader(BaseReader):
         """Reads a tab separated value file."""
         reader = pd.read_csv(input_file, sep='\t')
         headers = reader.columns
-        text_indices = [
-            index for index, h in enumerate(headers) if h != "label"
-        ]
+        text_indices = [index for index, h in enumerate(headers) if h != "label"]
         Example = namedtuple('Example', headers)
         examples = []
         for _, line in reader.iterrows():
@@ -298,31 +279,23 @@ class ClassifyReader(BaseReader):
 
     def _pad_batch_records(self, batch_records):
         batch_token_ids = [record.token_ids for record in batch_records]
-        batch_text_type_ids = [
-            record.text_type_ids for record in batch_records
-        ]
+        batch_text_type_ids = [record.text_type_ids for record in batch_records]
         batch_position_ids = [record.position_ids for record in batch_records]
         # 增加batch_adjacency_matrix
-        batch_adjacency_matrix = [
-            record.adjacency_matrix for record in batch_records
-        ]
+        batch_adjacency_matrix = [record.adjacency_matrix for record in batch_records]
         # 增加batch_head_ids
-        batch_head_ids = np.array(
-            [record.head_ids for record in batch_records]).astype("int64")
+        batch_head_ids = np.array([record.head_ids for record in batch_records]).astype("int64")
 
         if not self.is_inference:
             batch_labels = [record.label_id for record in batch_records]
             if self.is_classify:
-                batch_labels = np.array(batch_labels).astype("int64").reshape(
-                    [-1, 1])
+                batch_labels = np.array(batch_labels).astype("int64").reshape([-1, 1])
             elif self.is_regression:
-                batch_labels = np.array(batch_labels).astype(
-                    "float32").reshape([-1, 1])
+                batch_labels = np.array(batch_labels).astype("float32").reshape([-1, 1])
 
             if batch_records[0].qid:
                 batch_qids = [record.qid for record in batch_records]
-                batch_qids = np.array(batch_qids).astype("int64").reshape(
-                    [-1, 1])
+                batch_qids = np.array(batch_qids).astype("int64").reshape([-1, 1])
             else:
                 batch_qids = np.array([]).astype("int64").reshape([-1, 1])
 
@@ -332,16 +305,10 @@ class ClassifyReader(BaseReader):
                                                       max_len=self.max_seq_len,
                                                       pad_idx=self.pad_id,
                                                       return_input_mask=True)
-        padded_text_type_ids = pad_batch_data(batch_text_type_ids,
-                                              max_len=self.max_seq_len,
-                                              pad_idx=self.pad_id)
-        padded_position_ids = pad_batch_data(batch_position_ids,
-                                             max_len=self.max_seq_len,
-                                             pad_idx=self.pad_id)
-        padded_task_ids = np.ones_like(padded_token_ids,
-                                       dtype="int64") * self.task_id
-        padded_adjacency_matrix = pad_batch_graphs(batch_adjacency_matrix,
-                                                   max_len=self.max_seq_len)
+        padded_text_type_ids = pad_batch_data(batch_text_type_ids, max_len=self.max_seq_len, pad_idx=self.pad_id)
+        padded_position_ids = pad_batch_data(batch_position_ids, max_len=self.max_seq_len, pad_idx=self.pad_id)
+        padded_task_ids = np.ones_like(padded_token_ids, dtype="int64") * self.task_id
+        padded_adjacency_matrix = pad_batch_graphs(batch_adjacency_matrix, max_len=self.max_seq_len)
 
         return_list = [
             padded_token_ids,
@@ -361,30 +328,23 @@ class ClassifyReader(BaseReader):
 class SequenceLabelReader(BaseReader):
     def _pad_batch_records(self, batch_records):
         batch_token_ids = [record.token_ids for record in batch_records]
-        batch_text_type_ids = [
-            record.text_type_ids for record in batch_records
-        ]
+        batch_text_type_ids = [record.text_type_ids for record in batch_records]
         batch_position_ids = [record.position_ids for record in batch_records]
         batch_label_ids = [record.label_ids for record in batch_records]
 
         # padding
-        padded_token_ids, input_mask, batch_seq_lens = pad_batch_data(
-            batch_token_ids,
-            pad_idx=self.pad_id,
-            return_input_mask=True,
-            return_seq_lens=True)
-        padded_text_type_ids = pad_batch_data(batch_text_type_ids,
-                                              pad_idx=self.pad_id)
-        padded_position_ids = pad_batch_data(batch_position_ids,
-                                             pad_idx=self.pad_id)
-        padded_label_ids = pad_batch_data(batch_label_ids,
-                                          pad_idx=len(self.label_map) - 1)
-        padded_task_ids = np.ones_like(padded_token_ids,
-                                       dtype="int64") * self.task_id
+        padded_token_ids, input_mask, batch_seq_lens = pad_batch_data(batch_token_ids,
+                                                                      pad_idx=self.pad_id,
+                                                                      return_input_mask=True,
+                                                                      return_seq_lens=True)
+        padded_text_type_ids = pad_batch_data(batch_text_type_ids, pad_idx=self.pad_id)
+        padded_position_ids = pad_batch_data(batch_position_ids, pad_idx=self.pad_id)
+        padded_label_ids = pad_batch_data(batch_label_ids, pad_idx=len(self.label_map) - 1)
+        padded_task_ids = np.ones_like(padded_token_ids, dtype="int64") * self.task_id
 
         return_list = [
-            padded_token_ids, padded_text_type_ids, padded_position_ids,
-            padded_task_ids, input_mask, padded_label_ids, batch_seq_lens
+            padded_token_ids, padded_text_type_ids, padded_position_ids, padded_task_ids, input_mask, padded_label_ids,
+            batch_seq_lens
         ]
         return return_list
 
@@ -422,13 +382,9 @@ class SequenceLabelReader(BaseReader):
         position_ids = list(range(len(token_ids)))
         text_type_ids = [0] * len(token_ids)
         no_entity_id = len(self.label_map) - 1
-        label_ids = [no_entity_id
-                     ] + [self.label_map[label]
-                          for label in labels] + [no_entity_id]
+        label_ids = [no_entity_id] + [self.label_map[label] for label in labels] + [no_entity_id]
 
-        Record = namedtuple(
-            'Record',
-            ['token_ids', 'text_type_ids', 'position_ids', 'label_ids'])
+        Record = namedtuple('Record', ['token_ids', 'text_type_ids', 'position_ids', 'label_ids'])
         record = Record(token_ids=token_ids,
                         text_type_ids=text_type_ids,
                         position_ids=position_ids,
@@ -439,27 +395,20 @@ class SequenceLabelReader(BaseReader):
 class ExtractEmbeddingReader(BaseReader):
     def _pad_batch_records(self, batch_records):
         batch_token_ids = [record.token_ids for record in batch_records]
-        batch_text_type_ids = [
-            record.text_type_ids for record in batch_records
-        ]
+        batch_text_type_ids = [record.text_type_ids for record in batch_records]
         batch_position_ids = [record.position_ids for record in batch_records]
 
         # padding
-        padded_token_ids, input_mask, seq_lens = pad_batch_data(
-            batch_token_ids,
-            pad_idx=self.pad_id,
-            return_input_mask=True,
-            return_seq_lens=True)
-        padded_text_type_ids = pad_batch_data(batch_text_type_ids,
-                                              pad_idx=self.pad_id)
-        padded_position_ids = pad_batch_data(batch_position_ids,
-                                             pad_idx=self.pad_id)
-        padded_task_ids = np.ones_like(padded_token_ids,
-                                       dtype="int64") * self.task_id
+        padded_token_ids, input_mask, seq_lens = pad_batch_data(batch_token_ids,
+                                                                pad_idx=self.pad_id,
+                                                                return_input_mask=True,
+                                                                return_seq_lens=True)
+        padded_text_type_ids = pad_batch_data(batch_text_type_ids, pad_idx=self.pad_id)
+        padded_position_ids = pad_batch_data(batch_position_ids, pad_idx=self.pad_id)
+        padded_task_ids = np.ones_like(padded_token_ids, dtype="int64") * self.task_id
 
         return_list = [
-            padded_token_ids, padded_text_type_ids, padded_position_ids,
-            padded_task_ids, input_mask, seq_lens
+            padded_token_ids, padded_text_type_ids, padded_position_ids, padded_task_ids, input_mask, seq_lens
         ]
 
         return return_list
@@ -481,8 +430,7 @@ class MRCReader(BaseReader):
                  doc_stride=128,
                  max_query_length=64):
         self.max_seq_len = max_seq_len
-        self.tokenizer = tokenization.FullTokenizer(
-            vocab_file=vocab_path, do_lower_case=do_lower_case)
+        self.tokenizer = tokenization.FullTokenizer(vocab_file=vocab_path, do_lower_case=do_lower_case)
         self.vocab = self.tokenizer.vocab
         self.pad_id = self.vocab["[PAD]"]
         self.cls_id = self.vocab["[CLS]"]
@@ -518,9 +466,7 @@ class MRCReader(BaseReader):
 
                         if is_training:
                             if len(qa["answers"]) != 1:
-                                raise ValueError(
-                                    "For training, each question should have exactly 1 answer."
-                                )
+                                raise ValueError("For training, each question should have exactly 1 answer.")
 
                             answer = qa["answers"][0]
                             orig_answer_text = answer["text"]
@@ -528,27 +474,22 @@ class MRCReader(BaseReader):
                             answer_length = len(orig_answer_text)
                             doc_tokens = [
                                 paragraph_text[:answer_offset],
-                                paragraph_text[answer_offset:answer_offset +
-                                               answer_length],
+                                paragraph_text[answer_offset:answer_offset + answer_length],
                                 paragraph_text[answer_offset + answer_length:]
                             ]
 
                             start_pos = 1
                             end_pos = 1
 
-                            actual_text = " ".join(
-                                doc_tokens[start_pos:(end_pos + 1)])
+                            actual_text = " ".join(doc_tokens[start_pos:(end_pos + 1)])
                             if actual_text.find(orig_answer_text) == -1:
-                                print("Could not find answer: '%s' vs. '%s'",
-                                      actual_text, orig_answer_text)
+                                print("Could not find answer: '%s' vs. '%s'", actual_text, orig_answer_text)
                                 continue
                         else:
-                            doc_tokens = tokenization.tokenize_chinese_chars(
-                                paragraph_text)
+                            doc_tokens = tokenization.tokenize_chinese_chars(paragraph_text)
 
                         Example = namedtuple('Example', [
-                            'qas_id', 'question_text', 'doc_tokens',
-                            'orig_answer_text', 'start_position',
+                            'qas_id', 'question_text', 'doc_tokens', 'orig_answer_text', 'start_position',
                             'end_position'
                         ])
 
@@ -562,8 +503,7 @@ class MRCReader(BaseReader):
 
         return examples
 
-    def _improve_answer_span(self, doc_tokens, input_start, input_end,
-                             tokenizer, orig_answer_text):
+    def _improve_answer_span(self, doc_tokens, input_start, input_end, tokenizer, orig_answer_text):
         tok_answer_text = " ".join(tokenizer.tokenize(orig_answer_text))
 
         for new_start in range(input_start, input_end + 1):
@@ -585,20 +525,17 @@ class MRCReader(BaseReader):
                 continue
             num_left_context = position - doc_span.start
             num_right_context = end - position
-            score = min(num_left_context,
-                        num_right_context) + 0.01 * doc_span.length
+            score = min(num_left_context, num_right_context) + 0.01 * doc_span.length
             if best_score is None or score > best_score:
                 best_score = score
                 best_span_index = span_index
 
         return cur_span_index == best_span_index
 
-    def _convert_example_to_feature(self, examples, max_seq_length, tokenizer,
-                                    is_training):
+    def _convert_example_to_feature(self, examples, max_seq_length, tokenizer, is_training):
         Feature = namedtuple("Feature", [
-            "unique_id", "example_index", "doc_span_index", "tokens",
-            "token_to_orig_map", "token_is_max_context", "token_ids",
-            "position_ids", "text_type_ids", "start_position", "end_position"
+            "unique_id", "example_index", "doc_span_index", "tokens", "token_to_orig_map", "token_is_max_context",
+            "token_ids", "position_ids", "text_type_ids", "start_position", "end_position"
         ])
         features = []
         unique_id = 1000000000
@@ -622,14 +559,12 @@ class MRCReader(BaseReader):
             if is_training:
                 tok_start_position = orig_to_tok_index[example.start_position]
                 if example.end_position < len(example.doc_tokens) - 1:
-                    tok_end_position = orig_to_tok_index[example.end_position +
-                                                         1] - 1
+                    tok_end_position = orig_to_tok_index[example.end_position + 1] - 1
                 else:
                     tok_end_position = len(all_doc_tokens) - 1
-                (tok_start_position,
-                 tok_end_position) = self._improve_answer_span(
-                     all_doc_tokens, tok_start_position, tok_end_position,
-                     tokenizer, example.orig_answer_text)
+                (tok_start_position, tok_end_position) = self._improve_answer_span(all_doc_tokens, tok_start_position,
+                                                                                   tok_end_position, tokenizer,
+                                                                                   example.orig_answer_text)
 
             max_tokens_for_doc = max_seq_length - len(query_tokens) - 3
             _DocSpan = namedtuple("DocSpan", ["start", "length"])
@@ -659,11 +594,9 @@ class MRCReader(BaseReader):
 
                 for i in range(doc_span.length):
                     split_token_index = doc_span.start + i
-                    token_to_orig_map[len(
-                        tokens)] = tok_to_orig_index[split_token_index]
+                    token_to_orig_map[len(tokens)] = tok_to_orig_index[split_token_index]
 
-                    is_max_context = self._check_is_max_context(
-                        doc_spans, doc_span_index, split_token_index)
+                    is_max_context = self._check_is_max_context(doc_spans, doc_span_index, split_token_index)
                     token_is_max_context[len(tokens)] = is_max_context
                     tokens.append(all_doc_tokens[split_token_index])
                     text_type_ids.append(1)
@@ -678,8 +611,7 @@ class MRCReader(BaseReader):
                     doc_start = doc_span.start
                     doc_end = doc_span.start + doc_span.length - 1
                     out_of_span = False
-                    if not (tok_start_position >= doc_start
-                            and tok_end_position <= doc_end):
+                    if not (tok_start_position >= doc_start and tok_end_position <= doc_end):
                         out_of_span = True
                     if out_of_span:
                         start_position = 0
@@ -729,47 +661,31 @@ class MRCReader(BaseReader):
 
     def _pad_batch_records(self, batch_records, is_training):
         batch_token_ids = [record.token_ids for record in batch_records]
-        batch_text_type_ids = [
-            record.text_type_ids for record in batch_records
-        ]
+        batch_text_type_ids = [record.text_type_ids for record in batch_records]
         batch_position_ids = [record.position_ids for record in batch_records]
         if is_training:
-            batch_start_position = [
-                record.start_position for record in batch_records
-            ]
-            batch_end_position = [
-                record.end_position for record in batch_records
-            ]
-            batch_start_position = np.array(batch_start_position).astype(
-                "int64").reshape([-1, 1])
-            batch_end_position = np.array(batch_end_position).astype(
-                "int64").reshape([-1, 1])
+            batch_start_position = [record.start_position for record in batch_records]
+            batch_end_position = [record.end_position for record in batch_records]
+            batch_start_position = np.array(batch_start_position).astype("int64").reshape([-1, 1])
+            batch_end_position = np.array(batch_end_position).astype("int64").reshape([-1, 1])
 
         else:
             batch_size = len(batch_token_ids)
-            batch_start_position = np.zeros(shape=[batch_size, 1],
-                                            dtype="int64")
+            batch_start_position = np.zeros(shape=[batch_size, 1], dtype="int64")
             batch_end_position = np.zeros(shape=[batch_size, 1], dtype="int64")
 
         batch_unique_ids = [record.unique_id for record in batch_records]
-        batch_unique_ids = np.array(batch_unique_ids).astype("int64").reshape(
-            [-1, 1])
+        batch_unique_ids = np.array(batch_unique_ids).astype("int64").reshape([-1, 1])
 
         # padding
-        padded_token_ids, input_mask = pad_batch_data(batch_token_ids,
-                                                      pad_idx=self.pad_id,
-                                                      return_input_mask=True)
-        padded_text_type_ids = pad_batch_data(batch_text_type_ids,
-                                              pad_idx=self.pad_id)
-        padded_position_ids = pad_batch_data(batch_position_ids,
-                                             pad_idx=self.pad_id)
-        padded_task_ids = np.ones_like(padded_token_ids,
-                                       dtype="int64") * self.task_id
+        padded_token_ids, input_mask = pad_batch_data(batch_token_ids, pad_idx=self.pad_id, return_input_mask=True)
+        padded_text_type_ids = pad_batch_data(batch_text_type_ids, pad_idx=self.pad_id)
+        padded_position_ids = pad_batch_data(batch_position_ids, pad_idx=self.pad_id)
+        padded_task_ids = np.ones_like(padded_token_ids, dtype="int64") * self.task_id
 
         return_list = [
-            padded_token_ids, padded_text_type_ids, padded_position_ids,
-            padded_task_ids, input_mask, batch_start_position,
-            batch_end_position, batch_unique_ids
+            padded_token_ids, padded_text_type_ids, padded_position_ids, padded_task_ids, input_mask,
+            batch_start_position, batch_end_position, batch_unique_ids
         ]
 
         return return_list
@@ -783,20 +699,13 @@ class MRCReader(BaseReader):
     def get_examples(self, phase):
         return self.examples[phase]
 
-    def data_generator(self,
-                       input_file,
-                       batch_size,
-                       epoch,
-                       dev_count=1,
-                       shuffle=True,
-                       phase=None):
+    def data_generator(self, input_file, batch_size, epoch, dev_count=1, shuffle=True, phase=None):
 
         examples = self.examples.get(phase, None)
         features = self.features.get(phase, None)
         if not examples:
             examples = self._read_json(input_file, phase == "train")
-            features = self._convert_example_to_feature(
-                examples, self.max_seq_len, self.tokenizer, phase == "train")
+            features = self._convert_example_to_feature(examples, self.max_seq_len, self.tokenizer, phase == "train")
             self.examples[phase] = examples
             self.features[phase] = features
 
@@ -809,9 +718,7 @@ class MRCReader(BaseReader):
                 if phase == "train" and shuffle:
                     np.random.shuffle(features)
 
-                for batch_data in self._prepare_batch_data(features,
-                                                           batch_size,
-                                                           phase=phase):
+                for batch_data in self._prepare_batch_data(features, batch_size, phase=phase):
                     if len(all_dev_batches) < dev_count:
                         all_dev_batches.append(batch_data)
                     if len(all_dev_batches) == dev_count:

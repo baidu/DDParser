@@ -135,11 +135,7 @@ def get_adj_of_one_sent_in_ernie(arcs, length, max_len=None):
     return graph
 
 
-def get_adj_of_two_sent_in_ernie(arcs_a,
-                                 length_a,
-                                 arcs_b,
-                                 length_b,
-                                 max_len=None):
+def get_adj_of_two_sent_in_ernie(arcs_a, length_a, arcs_b, length_b, max_len=None):
     """
     当用户模型是ernie且输入为两条句子拼接在一起时，将弧转化为邻接矩阵(自动补齐[CLS],[SEP])
 
@@ -174,8 +170,7 @@ def get_adj_of_two_sent_in_ernie(arcs_a,
         arc_tails.append(0)
         arc_heads.append(0)
 
-    graph = np.zeros((max_len_a + max_len_b + 3, max_len_a + max_len_b + 3),
-                     dtype="int32")
+    graph = np.zeros((max_len_a + max_len_b + 3, max_len_a + max_len_b + 3), dtype="int32")
     for arc_tail, arc_head in zip(arc_tails, arc_heads):
         graph[arc_tail, arc_head] = 1
     for i in range(max_len_a + max_len_b + 3):
@@ -327,26 +322,18 @@ def _replace_escape(string):
     return string
 
 
-def transfor_head_id_for_ernie(head_id_a,
-                               length_a,
-                               head_id_b=None,
-                               length_b=None):
+def transfor_head_id_for_ernie(head_id_a, length_a, head_id_b=None, length_b=None):
     """
     当用户模型为ernie时, 获取新的核心词位置（由于拼接[CLS], [SEP]）
     """
     if head_id_b is None or length_b is None:
         return min(head_id_a + 1, length_a)
     else:
-        return (min(head_id_a + 1, length_a),
-                min(length_a + head_id_b + 2, length_a + length_b + 1))
+        return (min(head_id_a + 1, length_a), min(length_a + head_id_b + 2, length_a + length_b + 1))
 
 
 if __name__ == "__main__":
-    d = {
-        'word': ['10086', '话费', '清单', '查询'],
-        'head': [2, 3, 4, 0],
-        'deprel': ['ATT', 'ATT', 'VOB', 'HED']
-    }
+    d = {'word': ['10086', '话费', '清单', '查询'], 'head': [2, 3, 4, 0], 'deprel': ['ATT', 'ATT', 'VOB', 'HED']}
 
     t = ['1008', '##6', '话', '费', '清', '单', '查', '询']
     print(_merge_wordpiece_tokens(t))

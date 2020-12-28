@@ -40,32 +40,24 @@ def create_model(args,
                  ernie_version="1.0"):
     if is_classify:
         # 增加邻接矩阵和核心词的shape
-        pyreader = fluid.layers.py_reader(
-            capacity=50,
-            shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                    [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                    [-1, args.max_seq_len, 1], [-1, 1], [-1, 1],
-                    [-1, args.max_seq_len, args.max_seq_len], [-1, 2]],
-            dtypes=[
-                'int64', 'int64', 'int64', 'int64', 'float32', 'int64',
-                'int64', 'int64', 'int64'
-            ],
-            lod_levels=[0, 0, 0, 0, 0, 0, 0, 0, 0],
-            name=task_name + "_" + pyreader_name,
-            use_double_buffer=True)
-    elif is_regression:
         pyreader = fluid.layers.py_reader(capacity=50,
-                                          shapes=[[-1, args.max_seq_len, 1],
-                                                  [-1, args.max_seq_len, 1],
-                                                  [-1, args.max_seq_len, 1],
-                                                  [-1, args.max_seq_len, 1],
-                                                  [-1, args.max_seq_len, 1],
-                                                  [-1, 1], [-1, 1]],
+                                          shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
+                                                  [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
+                                                  [-1, args.max_seq_len, 1], [-1, 1], [-1, 1],
+                                                  [-1, args.max_seq_len, args.max_seq_len], [-1, 2]],
                                           dtypes=[
-                                              'int64', 'int64', 'int64',
-                                              'int64', 'float32', 'float32',
+                                              'int64', 'int64', 'int64', 'int64', 'float32', 'int64', 'int64', 'int64',
                                               'int64'
                                           ],
+                                          lod_levels=[0, 0, 0, 0, 0, 0, 0, 0, 0],
+                                          name=task_name + "_" + pyreader_name,
+                                          use_double_buffer=True)
+    elif is_regression:
+        pyreader = fluid.layers.py_reader(capacity=50,
+                                          shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
+                                                  [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
+                                                  [-1, args.max_seq_len, 1], [-1, 1], [-1, 1]],
+                                          dtypes=['int64', 'int64', 'int64', 'int64', 'float32', 'float32', 'int64'],
                                           lod_levels=[0, 0, 0, 0, 0, 0, 0],
                                           name=task_name + "_" + pyreader_name,
                                           use_double_buffer=True)
@@ -85,7 +77,7 @@ def create_model(args,
     cls_feats = ernie.get_pooled_output()
 
     # 增加GAT网络
-    gat = gnn.GAT(768, 100, 50, 0.0, 0.1, 12, 2)
+    gat = gnn.GAT(input_size=768, hidden_size=100, output_size=50, dropout=0.0, alpha=0.1, heads=12, layer=2)
     # 将ernie的表示和邻接矩阵输入到gat网络中得到包含句子结构信息的表示
     gat_emb = gat.forward(erinie_output, adj_mat)
     # 提取核心词的表示
@@ -93,23 +85,17 @@ def create_model(args,
     # 将[CLS]和核心词的表示拼接，供下游网络使用
     cls_feats = fluid.layers.concat([cls_feats, gat_emb], axis=1)
 
-    cls_feats = fluid.layers.dropout(x=cls_feats,
-                                     dropout_prob=0.1,
-                                     dropout_implementation="upscale_in_train")
-    logits = fluid.layers.fc(
-        input=cls_feats,
-        size=args.num_labels,
-        param_attr=fluid.ParamAttr(
-            name=task_name + "_cls_out_w",
-            initializer=fluid.initializer.TruncatedNormal(scale=0.02)),
-        bias_attr=fluid.ParamAttr(name=task_name + "_cls_out_b",
-                                  initializer=fluid.initializer.Constant(0.)))
+    cls_feats = fluid.layers.dropout(x=cls_feats, dropout_prob=0.1, dropout_implementation="upscale_in_train")
+    logits = fluid.layers.fc(input=cls_feats,
+                             size=args.num_labels,
+                             param_attr=fluid.ParamAttr(name=task_name + "_cls_out_w",
+                                                        initializer=fluid.initializer.TruncatedNormal(scale=0.02)),
+                             bias_attr=fluid.ParamAttr(name=task_name + "_cls_out_b",
+                                                       initializer=fluid.initializer.Constant(0.)))
 
     if is_prediction:
         probs = fluid.layers.softmax(logits)
-        feed_targets_name = [
-            src_ids.name, sent_ids.name, pos_ids.name, input_mask.name
-        ]
+        feed_targets_name = [src_ids.name, sent_ids.name, pos_ids.name, input_mask.name]
         if ernie_version == "2.0":
             feed_targets_name += [task_ids.name]
         return pyreader, probs, feed_targets_name
@@ -117,12 +103,9 @@ def create_model(args,
     assert is_classify != is_regression, 'is_classify or is_regression must be true and only one of them can be true'
     num_seqs = fluid.layers.create_tensor(dtype='int64')
     if is_classify:
-        ce_loss, probs = fluid.layers.softmax_with_cross_entropy(
-            logits=logits, label=labels, return_softmax=True)
+        ce_loss, probs = fluid.layers.softmax_with_cross_entropy(logits=logits, label=labels, return_softmax=True)
         loss = fluid.layers.mean(x=ce_loss)
-        accuracy = fluid.layers.accuracy(input=probs,
-                                         label=labels,
-                                         total=num_seqs)
+        accuracy = fluid.layers.accuracy(input=probs, label=labels, total=num_seqs)
         graph_vars = {
             "loss": loss,
             "probs": probs,
@@ -134,16 +117,9 @@ def create_model(args,
     elif is_regression:
         cost = fluid.layers.square_error_cost(input=logits, label=labels)
         loss = fluid.layers.mean(x=cost)
-        graph_vars = {
-            "loss": loss,
-            "probs": logits,
-            "labels": labels,
-            "num_seqs": num_seqs,
-            "qids": qids
-        }
+        graph_vars = {"loss": loss, "probs": logits, "labels": labels, "num_seqs": num_seqs, "qids": qids}
     else:
-        raise ValueError(
-            'unsupported fine tune mode. only supported classify/regression')
+        raise ValueError('unsupported fine tune mode. only supported classify/regression')
 
     return pyreader, graph_vars
 
@@ -207,10 +183,7 @@ def evaluate_classify(exe,
                       metric='simple_accuracy',
                       is_classify=False,
                       is_regression=False):
-    train_fetch_list = [
-        graph_vars["loss"].name, graph_vars["accuracy"].name,
-        graph_vars["num_seqs"].name
-    ]
+    train_fetch_list = [graph_vars["loss"].name, graph_vars["accuracy"].name, graph_vars["num_seqs"].name]
 
     if eval_phase == "train":
         if "learning_rate" in graph_vars:
@@ -227,18 +200,16 @@ def evaluate_classify(exe,
     time_begin = time.time()
 
     fetch_list = [
-        graph_vars["loss"].name, graph_vars["accuracy"].name,
-        graph_vars["probs"].name, graph_vars["labels"].name,
+        graph_vars["loss"].name, graph_vars["accuracy"].name, graph_vars["probs"].name, graph_vars["labels"].name,
         graph_vars["num_seqs"].name, graph_vars["qids"].name
     ]
     while True:
         try:
             if use_multi_gpu_test:
-                np_loss, np_acc, np_probs, np_labels, np_num_seqs, np_qids = exe.run(
-                    fetch_list=fetch_list)
+                np_loss, np_acc, np_probs, np_labels, np_num_seqs, np_qids = exe.run(fetch_list=fetch_list)
             else:
-                np_loss, np_acc, np_probs, np_labels, np_num_seqs, np_qids = exe.run(
-                    program=test_program, fetch_list=fetch_list)
+                np_loss, np_acc, np_probs, np_labels, np_num_seqs, np_qids = exe.run(program=test_program,
+                                                                                     fetch_list=fetch_list)
             total_cost += np.sum(np_loss * np_num_seqs)
             total_acc += np.sum(np_acc * np_num_seqs)
             total_num_seqs += np.sum(np_num_seqs)
@@ -278,8 +249,7 @@ def evaluate_classify(exe,
             % (eval_phase, cost, ret, total_num_seqs, elapsed_time)
     elif metric == "acc_and_f1_and_mrr":
         ret_a = acc_and_f1(preds, labels)
-        preds = sorted(zip(qids, scores, labels),
-                       key=lambda elem: (elem[0], -elem[1]))
+        preds = sorted(zip(qids, scores, labels), key=lambda elem: (elem[0], -elem[1]))
         ret_b = evaluate_mrr(preds)
         evaluate_info = "[%s evaluation] ave loss: %f, acc: %f, f1: %f, mrr: %f, data_num: %d, elapsed time: %f s" \
             % (eval_phase, cost, ret_a['acc'], ret_a['f1'], ret_b, total_num_seqs, elapsed_time)
@@ -310,20 +280,15 @@ def evaluate_regression(exe,
     total_cost, total_num_seqs = 0.0, 0.0
     qids, labels, scores = [], [], []
 
-    fetch_list = [
-        graph_vars["loss"].name, graph_vars["probs"].name,
-        graph_vars["labels"].name, graph_vars["qids"].name
-    ]
+    fetch_list = [graph_vars["loss"].name, graph_vars["probs"].name, graph_vars["labels"].name, graph_vars["qids"].name]
 
     time_begin = time.time()
     while True:
         try:
             if use_multi_gpu_test:
-                np_loss, np_probs, np_labels, np_qids = exe.run(
-                    fetch_list=fetch_list)
+                np_loss, np_probs, np_labels, np_qids = exe.run(fetch_list=fetch_list)
             else:
-                np_loss, np_probs, np_labels, np_qids = exe.run(
-                    program=test_program, fetch_list=fetch_list)
+                np_loss, np_probs, np_labels, np_qids = exe.run(program=test_program, fetch_list=fetch_list)
             labels.extend(np_labels.reshape((-1)).tolist())
             if np_qids is None:
                 np_qids = np.array([])
@@ -382,8 +347,7 @@ def matthews_corrcoef(preds, labels):
     fp = np.sum((labels == 0) & (preds == 1))
     fn = np.sum((labels == 1) & (preds == 0))
 
-    mcc = ((tp * tn) - (fp * fn)) / np.sqrt(
-        (tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+    mcc = ((tp * tn) - (fp * fn)) / np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
     return mcc
 
 
@@ -433,13 +397,7 @@ def simple_accuracy(preds, labels):
     return (preds == labels).mean()
 
 
-def predict(exe,
-            test_program,
-            test_pyreader,
-            graph_vars,
-            dev_count=1,
-            is_classify=False,
-            is_regression=False):
+def predict(exe, test_program, test_pyreader, graph_vars, dev_count=1, is_classify=False, is_regression=False):
     test_pyreader.start()
     qids, scores, probs = [], [], []
     preds = []
@@ -449,8 +407,7 @@ def predict(exe,
     while True:
         try:
             if dev_count == 1:
-                np_probs, np_qids = exe.run(program=test_program,
-                                            fetch_list=fetch_list)
+                np_probs, np_qids = exe.run(program=test_program, fetch_list=fetch_list)
             else:
                 np_probs, np_qids = exe.run(fetch_list=fetch_list)
 

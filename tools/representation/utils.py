@@ -55,8 +55,7 @@ def index_sample(x, index):
     batch_size = layers.cast(layers.shape(index)[0], dtype=index.dtype)
     zero = layers.fill_constant(shape=[1], dtype=index.dtype, value=0)
     one = layers.fill_constant(shape=[1], dtype=index.dtype, value=1)
-    arr_index = layers.unsqueeze(
-        layers.range(zero, batch_size, one, dtype=index.dtype), [1, 2])
+    arr_index = layers.unsqueeze(layers.range(zero, batch_size, one, dtype=index.dtype), [1, 2])
 
     arr_index = layers.expand_as(arr_index, index)
     #  genrate new index

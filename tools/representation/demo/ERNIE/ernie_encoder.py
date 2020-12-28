@@ -52,26 +52,23 @@ run_type_g.add_arg("use_cuda",                     bool,   True,  "If set, use G
 
 
 def create_model(args, pyreader_name, ernie_config):
-    pyreader = fluid.layers.py_reader(
-        capacity=50,
-        shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, 1], [-1, 1]],
-        dtypes=['int64', 'int64', 'int64', 'int64', 'float', 'int64'],
-        lod_levels=[0, 0, 0, 0, 0, 0],
-        name=pyreader_name,
-        use_double_buffer=True)
+    pyreader = fluid.layers.py_reader(capacity=50,
+                                      shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
+                                              [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
+                                              [-1, args.max_seq_len, 1], [-1, 1]],
+                                      dtypes=['int64', 'int64', 'int64', 'int64', 'float', 'int64'],
+                                      lod_levels=[0, 0, 0, 0, 0, 0],
+                                      name=pyreader_name,
+                                      use_double_buffer=True)
 
-    (src_ids, sent_ids, pos_ids, task_ids, input_mask,
-     seq_lens) = fluid.layers.read_file(pyreader)
+    (src_ids, sent_ids, pos_ids, task_ids, input_mask, seq_lens) = fluid.layers.read_file(pyreader)
 
-    ernie = ErnieModel(
-        src_ids=src_ids,
-        position_ids=pos_ids,
-        sentence_ids=sent_ids,
-        task_ids=task_ids,
-        input_mask=input_mask,
-        config=ernie_config)
+    ernie = ErnieModel(src_ids=src_ids,
+                       position_ids=pos_ids,
+                       sentence_ids=sent_ids,
+                       task_ids=task_ids,
+                       input_mask=input_mask,
+                       config=ernie_config)
 
     enc_out = ernie.get_sequence_output()
     unpad_enc_out = fluid.layers.sequence_unpad(enc_out, length=seq_lens)
@@ -104,18 +101,13 @@ def main(args):
 
     exe = fluid.Executor(place)
 
-    reader = task_reader.ExtractEmbeddingReader(
-        vocab_path=args.vocab_path,
-        max_seq_len=args.max_seq_len,
-        do_lower_case=args.do_lower_case)
+    reader = task_reader.ExtractEmbeddingReader(vocab_path=args.vocab_path,
+                                                max_seq_len=args.max_seq_len,
+                                                do_lower_case=args.do_lower_case)
 
     startup_prog = fluid.Program()
 
-    data_generator = reader.data_generator(
-        input_file=args.data_set,
-        batch_size=args.batch_size,
-        epoch=1,
-        shuffle=False)
+    data_generator = reader.data_generator(input_file=args.data_set, batch_size=args.batch_size, epoch=1, shuffle=False)
 
     total_examples = reader.get_num_examples(args.data_set)
 
@@ -126,8 +118,7 @@ def main(args):
 
     with fluid.program_guard(infer_program, startup_prog):
         with fluid.unique_name.guard():
-            pyreader, graph_vars = create_model(
-                args, pyreader_name='reader', ernie_config=ernie_config)
+            pyreader, graph_vars = create_model(args, pyreader_name='reader', ernie_config=ernie_config)
 
             fluid.memory_optimize(input_program=infer_program)
 
@@ -136,11 +127,9 @@ def main(args):
     exe.run(startup_prog)
 
     if args.init_pretraining_params:
-        init_pretraining_params(
-            exe, args.init_pretraining_params, main_program=startup_prog)
+        init_pretraining_params(exe, args.init_pretraining_params, main_program=startup_prog)
     else:
-        raise ValueError(
-            "WARNING: args 'init_pretraining_params' must be specified")
+        raise ValueError("WARNING: args 'init_pretraining_params' must be specified")
 
     exec_strategy = fluid.ExecutionStrategy()
     exec_strategy.num_threads = dev_count
@@ -155,10 +144,7 @@ def main(args):
         try:
             cls_emb, unpad_top_layer_emb = exe.run(
                 program=infer_program,
-                fetch_list=[
-                    graph_vars["cls_embeddings"].name,
-                    graph_vars["top_layer_embeddings"].name
-                ],
+                fetch_list=[graph_vars["cls_embeddings"].name, graph_vars["top_layer_embeddings"].name],
                 return_numpy=False)
             # batch_size * embedding_size
             total_cls_emb.append(np.array(cls_emb))
@@ -169,11 +155,9 @@ def main(args):
     total_cls_emb = np.concatenate(total_cls_emb)
     total_top_layer_emb = np.concatenate(total_top_layer_emb)
 
-    with open(os.path.join(args.output_dir, "cls_emb.npy"),
-              "w") as cls_emb_file:
+    with open(os.path.join(args.output_dir, "cls_emb.npy"), "w") as cls_emb_file:
         np.save(cls_emb_file, total_cls_emb)
-    with open(os.path.join(args.output_dir, "top_layer_emb.npy"),
-              "w") as top_layer_emb_file:
+    with open(os.path.join(args.output_dir, "top_layer_emb.npy"), "w") as top_layer_emb_file:
         np.save(top_layer_emb_file, total_top_layer_emb)
 
 

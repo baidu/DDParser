@@ -49,9 +49,7 @@ def _read_tsv(self, input_file, quotechar=None):
     """Reads a tab separated value file."""
     reader = pd.read_csv(input_file, sep='\t')
     headers = reader.columns
-    text_indices = [
-        index for index, h in enumerate(headers) if h != "label"
-    ]
+    text_indices = [index for index, h in enumerate(headers) if h != "label"]
     Example = namedtuple('Example', headers)
     examples = []
     for _, line in reader.iterrows():
@@ -88,8 +86,8 @@ def _convert_example_to_record(self, example, max_seq_length, tokenizer):
         ddp_res_b = eval(example.ddp_res_b)
         tokens_b = tokenizer.tokenize(text_b)
         # 获取句子b的弧及核心词索引
-        arcs_b, head_id_b = get_arcs_and_head_in_wordpiece(
-            ddp_res_b, tokens_b)
+        arcs_b, head_id_b = get_arcs_and_head_in_wordpiece(ddp_res_b, tokens_b)
+
 
     if tokens_b:
         # Modifies `tokens_a` and `tokens_b` in place so that the total
@@ -100,14 +98,13 @@ def _convert_example_to_record(self, example, max_seq_length, tokenizer):
         adjacency_matrix = get_adj_of_two_sent_in_ernie(
             arcs_a, len(tokens_a), arcs_b, len(tokens_b))
         # 获取映射后核心词索引
-        head_ids = transfor_head_id_for_ernie(head_id_a, len(tokens_a),
-                                              head_id_b, len(tokens_b))
+        head_ids = transfor_head_id_for_ernie(head_id_a, len(tokens_a), head_id_b, len(tokens_b))
+
     else:
         # Account for [CLS] and [SEP] with "- 2"
         if len(tokens_a) > max_seq_length - 2:
             tokens_a = tokens_a[0:(max_seq_length - 2)]
-        adjacency_matrix = get_adj_of_one_sent_in_ernie(
-            arcs_a, len(tokens_a))
+        adjacency_matrix = get_adj_of_one_sent_in_ernie(arcs_a, len(tokens_a))
         head_ids = transfor_head_id_for_ernie(head_id_a, len(tokens_a))
 
     # 以下代码省略
@@ -116,9 +113,8 @@ def _convert_example_to_record(self, example, max_seq_length, tokenizer):
     # 增加adjacency_matrix和head_ids特征
     if self.is_inference:
         Record = namedtuple('Record', [
-            'token_ids', 'text_type_ids', 'position_ids',
-            'adjacency_matrix', 'head_ids'
-        ])
+                            ['token_ids', 'text_type_ids', 'position_ids', 'adjacency_matrix', 'head_ids'])
+
         record = Record(token_ids=token_ids,
                         text_type_ids=text_type_ids,
                         position_ids=position_ids,
@@ -130,10 +126,10 @@ def _convert_example_to_record(self, example, max_seq_length, tokenizer):
         else:
             label_id = example.label
 
-        Record = namedtuple('Record', [
-            'token_ids', 'text_type_ids', 'position_ids', 'label_id', 'qid',
-            'adjacency_matrix', 'head_ids'
-        ])
+        Record = namedtuple(
+            'Record',
+            ['token_ids', 'text_type_ids', 'position_ids', 'label_id', 'qid', 'adjacency_matrix', 'head_ids'])
+
 
         qid = None
         if "qid" in example._fields:
@@ -175,45 +171,33 @@ def _pad_batch_records(self, batch_records):
     batch_text_type_ids = [record.text_type_ids for record in batch_records]
     batch_position_ids = [record.position_ids for record in batch_records]
     # 增加batch_adjacency_matrix
-    batch_adjacency_matrix = [
-        record.adjacency_matrix for record in batch_records
-    ]
+    batch_adjacency_matrix = [record.adjacency_matrix for record in batch_records]
     # 增加batch_head_ids
-    batch_head_ids = np.array([record.head_ids
-                                for record in batch_records]).astype("int64")
+    batch_head_ids = np.array([record.head_ids for record in batch_records]).astype("int64")
 
     if not self.is_inference:
         batch_labels = [record.label_id for record in batch_records]
         if self.is_classify:
-            batch_labels = np.array(batch_labels).astype("int64").reshape(
-                [-1, 1])
+            batch_labels = np.array(batch_labels).astype("int64").reshape([-1, 1])
         elif self.is_regression:
-            batch_labels = np.array(batch_labels).astype("float32").reshape(
-                [-1, 1])
+            batch_labels = np.array(batch_labels).astype("float32").reshape([-1, 1])
 
         if batch_records[0].qid:
             batch_qids = [record.qid for record in batch_records]
-            batch_qids = np.array(batch_qids).astype("int64").reshape(
-                [-1, 1])
+            batch_qids = np.array(batch_qids).astype("int64").reshape([-1, 1])
         else:
             batch_qids = np.array([]).astype("int64").reshape([-1, 1])
 
     # padding
     # 增加max_len=self.max_seq_len，将所有batch的长度都填充到最大长度
     padded_token_ids, input_mask = pad_batch_data(batch_token_ids,
-                                                  max_len=self.max_seq_len,
-                                                  pad_idx=self.pad_id,
-                                                  return_input_mask=True)
-    padded_text_type_ids = pad_batch_data(batch_text_type_ids,
-                                          max_len=self.max_seq_len,
-                                          pad_idx=self.pad_id)
-    padded_position_ids = pad_batch_data(batch_position_ids,
-                                          max_len=self.max_seq_len,
-                                          pad_idx=self.pad_id)
-    padded_task_ids = np.ones_like(padded_token_ids,
-                                    dtype="int64") * self.task_id
-    padded_adjacency_matrix = pad_batch_graphs(batch_adjacency_matrix,
-                                                max_len=self.max_seq_len)
+                                                    max_len=self.max_seq_len,
+                                                    pad_idx=self.pad_id,
+                                                    return_input_mask=True)
+    padded_text_type_ids = pad_batch_data(batch_text_type_ids, max_len=self.max_seq_len, pad_idx=self.pad_id)
+    padded_position_ids = pad_batch_data(batch_position_ids, max_len=self.max_seq_len, pad_idx=self.pad_id)
+    padded_task_ids = np.ones_like(padded_token_ids, dtype="int64") * self.task_id
+    padded_adjacency_matrix = pad_batch_graphs(batch_adjacency_matrix, max_len=self.max_seq_len)
 
     return_list = [
         padded_token_ids,
@@ -241,32 +225,24 @@ def create_model(args,
                  ernie_version="1.0"):
     if is_classify:
         # 增加邻接矩阵和核心词的shape
-        pyreader = fluid.layers.py_reader(
-            capacity=50,
-            shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                    [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                    [-1, args.max_seq_len, 1], [-1, 1], [-1, 1],
-                    [-1, args.max_seq_len, args.max_seq_len], [-1, 2]],
-            dtypes=[
-                'int64', 'int64', 'int64', 'int64', 'float32', 'int64',
-                'int64', 'int64', 'int64'
-            ],
-            lod_levels=[0, 0, 0, 0, 0, 0, 0, 0, 0],
-            name=task_name + "_" + pyreader_name,
-            use_double_buffer=True)
-    elif is_regression:
         pyreader = fluid.layers.py_reader(capacity=50,
-                                          shapes=[[-1, args.max_seq_len, 1],
-                                                  [-1, args.max_seq_len, 1],
-                                                  [-1, args.max_seq_len, 1],
-                                                  [-1, args.max_seq_len, 1],
-                                                  [-1, args.max_seq_len, 1],
-                                                  [-1, 1], [-1, 1]],
+                                          shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
+                                                  [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
+                                                  [-1, args.max_seq_len, 1], [-1, 1], [-1, 1],
+                                                  [-1, args.max_seq_len, args.max_seq_len], [-1, 2]],
                                           dtypes=[
-                                              'int64', 'int64', 'int64',
-                                              'int64', 'float32', 'float32',
+                                              'int64', 'int64', 'int64', 'int64', 'float32', 'int64', 'int64', 'int64',
                                               'int64'
                                           ],
+                                          lod_levels=[0, 0, 0, 0, 0, 0, 0, 0, 0],
+                                          name=task_name + "_" + pyreader_name,
+                                          use_double_buffer=True)
+    elif is_regression:
+        pyreader = fluid.layers.py_reader(capacity=50,
+                                          shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
+                                                  [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
+                                                  [-1, args.max_seq_len, 1], [-1, 1], [-1, 1]],
+                                          dtypes=['int64', 'int64', 'int64', 'int64', 'float32', 'float32', 'int64'],
                                           lod_levels=[0, 0, 0, 0, 0, 0, 0],
                                           name=task_name + "_" + pyreader_name,
                                           use_double_buffer=True)
@@ -285,7 +261,7 @@ def create_model(args,
     cls_feats = ernie.get_pooled_output()
 
     # 增加GAT网络
-    gat = gnn.GAT(768, 100, 200, 0.0, 0.1, 12, 2)
+    gat = gnn.GAT(input_size=768, hidden_size=100, output_size=50, dropout=0.0, alpha=0.1, heads=12, layer=2)
     # 将ernie的表示和邻接矩阵输入到gat网络中得到包含句子结构信息的表示
     gat_emb = gat.forward(erinie_output, adj_mat)
     # 提取核心词的表示

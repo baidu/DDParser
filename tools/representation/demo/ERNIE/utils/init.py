@@ -31,51 +31,36 @@ def cast_fp32_to_fp16(exe, main_program):
             data = np.array(param_t)
             if param.name.find("layer_norm") == -1:
                 param_t.set(np.float16(data).view(np.uint16), exe.place)
-            master_param_var = fluid.global_scope().find_var(param.name +
-                                                             ".master")
+            master_param_var = fluid.global_scope().find_var(param.name + ".master")
             if master_param_var is not None:
                 master_param_var.get_tensor().set(data, exe.place)
 
 
 def init_checkpoint(exe, init_checkpoint_path, main_program, use_fp16=False):
-    assert os.path.exists(
-        init_checkpoint_path), "[%s] cann't be found." % init_checkpoint_path
+    assert os.path.exists(init_checkpoint_path), "[%s] cann't be found." % init_checkpoint_path
 
     def existed_persitables(var):
         if not fluid.io.is_persistable(var):
             return False
         return os.path.exists(os.path.join(init_checkpoint_path, var.name))
 
-    fluid.io.load_vars(
-        exe,
-        init_checkpoint_path,
-        main_program=main_program,
-        predicate=existed_persitables)
+    fluid.io.load_vars(exe, init_checkpoint_path, main_program=main_program, predicate=existed_persitables)
     print("Load model from {}".format(init_checkpoint_path))
 
     if use_fp16:
         cast_fp32_to_fp16(exe, main_program)
 
 
-def init_pretraining_params(exe,
-                            pretraining_params_path,
-                            main_program,
-                            use_fp16=False):
-    assert os.path.exists(pretraining_params_path
-                          ), "[%s] cann't be found." % pretraining_params_path
+def init_pretraining_params(exe, pretraining_params_path, main_program, use_fp16=False):
+    assert os.path.exists(pretraining_params_path), "[%s] cann't be found." % pretraining_params_path
 
     def existed_params(var):
         if not isinstance(var, fluid.framework.Parameter):
             return False
         return os.path.exists(os.path.join(pretraining_params_path, var.name))
 
-    fluid.io.load_vars(
-        exe,
-        pretraining_params_path,
-        main_program=main_program,
-        predicate=existed_params)
-    print("Load pretraining parameters from {}.".format(
-        pretraining_params_path))
+    fluid.io.load_vars(exe, pretraining_params_path, main_program=main_program, predicate=existed_params)
+    print("Load pretraining parameters from {}.".format(pretraining_params_path))
 
     if use_fp16:
         cast_fp32_to_fp16(exe, main_program)

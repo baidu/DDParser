@@ -25,9 +25,8 @@ def mixed_segmentation(in_str, rm_punc=False):
     segs_out = []
     temp_str = ""
     sp_char = [
-        '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。', '：',
-        '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', '「', '」', '（',
-        '）', '－', '～', '『', '』'
+        '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。', '：', '？', '！', '“', '”', '；', '’', '《', '》',
+        '……', '·', '、', '「', '」', '（', '）', '－', '～', '『', '』'
     ]
     for char in in_str:
         if rm_punc and char in sp_char:
@@ -53,9 +52,8 @@ def mixed_segmentation(in_str, rm_punc=False):
 def remove_punctuation(in_str):
     in_str = str(in_str).decode('utf-8').lower().strip()
     sp_char = [
-        '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。', '：',
-        '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', '「', '」', '（',
-        '）', '－', '～', '『', '』'
+        '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。', '：', '？', '！', '“', '”', '；', '’', '《', '》',
+        '……', '·', '、', '「', '」', '（', '）', '－', '～', '『', '』'
     ]
     out_segs = []
     for char in in_str:
@@ -97,8 +95,7 @@ def evaluate(ground_truth_file, prediction_file):
                 answers = [ans["text"] for ans in qas["answers"]]
 
                 if query_id not in prediction_file:
-                    sys.stderr.write('Unanswered question: {}\n'.format(
-                        query_id))
+                    sys.stderr.write('Unanswered question: {}\n'.format(query_id))
                     skip_count += 1
                     continue
 

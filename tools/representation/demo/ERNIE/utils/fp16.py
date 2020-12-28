@@ -18,49 +18,45 @@ import paddle.fluid as fluid
 
 
 def cast_fp16_to_fp32(i, o, prog):
-    prog.global_block().append_op(
-        type="cast",
-        inputs={"X": i},
-        outputs={"Out": o},
-        attrs={
-            "in_dtype": fluid.core.VarDesc.VarType.FP16,
-            "out_dtype": fluid.core.VarDesc.VarType.FP32
-        })
+    prog.global_block().append_op(type="cast",
+                                  inputs={"X": i},
+                                  outputs={"Out": o},
+                                  attrs={
+                                      "in_dtype": fluid.core.VarDesc.VarType.FP16,
+                                      "out_dtype": fluid.core.VarDesc.VarType.FP32
+                                  })
 
 
 def cast_fp32_to_fp16(i, o, prog):
-    prog.global_block().append_op(
-        type="cast",
-        inputs={"X": i},
-        outputs={"Out": o},
-        attrs={
-            "in_dtype": fluid.core.VarDesc.VarType.FP32,
-            "out_dtype": fluid.core.VarDesc.VarType.FP16
-        })
+    prog.global_block().append_op(type="cast",
+                                  inputs={"X": i},
+                                  outputs={"Out": o},
+                                  attrs={
+                                      "in_dtype": fluid.core.VarDesc.VarType.FP32,
+                                      "out_dtype": fluid.core.VarDesc.VarType.FP16
+                                  })
 
 
 def copy_to_master_param(p, block):
     v = block.vars.get(p.name, None)
     if v is None:
         raise ValueError("no param name %s found!" % p.name)
-    new_p = fluid.framework.Parameter(
-        block=block,
-        shape=v.shape,
-        dtype=fluid.core.VarDesc.VarType.FP32,
-        type=v.type,
-        lod_level=v.lod_level,
-        stop_gradient=p.stop_gradient,
-        trainable=p.trainable,
-        optimize_attr=p.optimize_attr,
-        regularizer=p.regularizer,
-        gradient_clip_attr=p.gradient_clip_attr,
-        error_clip=p.error_clip,
-        name=v.name + ".master")
+    new_p = fluid.framework.Parameter(block=block,
+                                      shape=v.shape,
+                                      dtype=fluid.core.VarDesc.VarType.FP32,
+                                      type=v.type,
+                                      lod_level=v.lod_level,
+                                      stop_gradient=p.stop_gradient,
+                                      trainable=p.trainable,
+                                      optimize_attr=p.optimize_attr,
+                                      regularizer=p.regularizer,
+                                      gradient_clip_attr=p.gradient_clip_attr,
+                                      error_clip=p.error_clip,
+                                      name=v.name + ".master")
     return new_p
 
 
-def create_master_params_grads(params_grads, main_prog, startup_prog,
-                               loss_scaling):
+def create_master_params_grads(params_grads, main_prog, startup_prog, loss_scaling):
     master_params_grads = []
     tmp_role = main_prog._current_role
     OpRole = fluid.core.op_proto_and_checker_maker.OpRole
@@ -68,8 +64,7 @@ def create_master_params_grads(params_grads, main_prog, startup_prog,
     for p, g in params_grads:
         # create master parameters
         master_param = copy_to_master_param(p, main_prog.global_block())
-        startup_master_param = startup_prog.global_block()._clone_variable(
-            master_param)
+        startup_master_param = startup_prog.global_block()._clone_variable(master_param)
         startup_p = startup_prog.global_block().var(p.name)
         cast_fp16_to_fp32(startup_p, startup_master_param, startup_prog)
         # cast fp16 gradients to fp32 before apply gradients

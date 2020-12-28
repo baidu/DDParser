@@ -83,8 +83,7 @@ class ErnieDataReader(object):
         pos_ids = [int(token) for token in pos_ids.split(" ")]
         seg_labels = [int(seg_label) for seg_label in seg_labels.split(" ")]
         assert len(token_ids) == len(sent_ids) == len(pos_ids) == len(
-            seg_labels
-        ), "[Must be true]len(token_ids) == len(sent_ids) == len(pos_ids) == len(seg_labels)"
+            seg_labels), "[Must be true]len(token_ids) == len(sent_ids) == len(pos_ids) == len(seg_labels)"
         label = int(label)
         if len(token_ids) > max_seq_len:
             return None
@@ -94,8 +93,7 @@ class ErnieDataReader(object):
         assert file.endswith('.gz'), "[ERROR] %s is not a gzip file" % file
         with gzip.open(file, "rb") as f:
             for line in f:
-                parsed_line = self.parse_line(
-                    line, max_seq_len=self.max_seq_len)
+                parsed_line = self.parse_line(line, max_seq_len=self.max_seq_len)
                 if parsed_line is None:
                     continue
                 yield parsed_line
@@ -154,29 +152,22 @@ class ErnieDataReader(object):
             if left_len <= max_len:
                 return (token_seq[1:sep_index], seg_labels[1:sep_index])
             else:
-                return [
-                    token_seq[sep_index + 1:-1], seg_labels[sep_index + 1:-1]
-                ]
+                return [token_seq[sep_index + 1:-1], seg_labels[sep_index + 1:-1]]
 
         for i in range(num_sample):
             pair_index = (i + 1) % num_sample
-            left_tokens, left_seg_labels = split_sent(
-                pos_samples[i], (self.max_seq_len - 3) // 2, self.sep_id)
-            right_tokens, right_seg_labels = split_sent(
-                pos_samples[pair_index],
-                self.max_seq_len - 3 - len(left_tokens), self.sep_id)
+            left_tokens, left_seg_labels = split_sent(pos_samples[i], (self.max_seq_len - 3) // 2, self.sep_id)
+            right_tokens, right_seg_labels = split_sent(pos_samples[pair_index],
+                                                        self.max_seq_len - 3 - len(left_tokens), self.sep_id)
 
             token_seq = [self.cls_id] + left_tokens + [self.sep_id] + \
                     right_tokens + [self.sep_id]
             if len(token_seq) > self.max_seq_len:
                 miss_num += 1
                 continue
-            type_seq = [0] * (len(left_tokens) + 2) + [1] * (len(right_tokens) +
-                                                             1)
+            type_seq = [0] * (len(left_tokens) + 2) + [1] * (len(right_tokens) + 1)
             pos_seq = range(len(token_seq))
-            seg_label_seq = [-1] + left_seg_labels + [-1] + right_seg_labels + [
-                -1
-            ]
+            seg_label_seq = [-1] + left_seg_labels + [-1] + right_seg_labels + [-1]
 
             assert len(token_seq) == len(type_seq) == len(pos_seq) == len(seg_label_seq), \
                     "[ERROR]len(src_id) == lne(sent_id) == len(pos_id) must be True"
@@ -206,8 +197,7 @@ class ErnieDataReader(object):
                     pos_samples.append(pos_sample)
                     pos_sample_num += 1
 
-                neg_samples, miss_num = self.random_pair_neg_samples(
-                    pos_samples)
+                neg_samples, miss_num = self.random_pair_neg_samples(pos_samples)
                 num_total_miss += miss_num
                 samples = pos_samples + neg_samples
                 pos_samples = []
@@ -221,8 +211,7 @@ class ErnieDataReader(object):
             elif len(pos_samples) == 0:
                 yield None
             else:
-                neg_samples, miss_num = self.random_pair_neg_samples(
-                    pos_samples)
+                neg_samples, miss_num = self.random_pair_neg_samples(pos_samples)
                 num_total_miss += miss_num
                 samples = pos_samples + neg_samples
                 pos_samples = []
@@ -230,8 +219,7 @@ class ErnieDataReader(object):
                 for sample in samples:
                     yield sample
             print("miss_num:%d\tideal_total_sample_num:%d\tmiss_rate:%f" %
-                  (num_total_miss, pos_sample_num * 2,
-                   num_total_miss / (pos_sample_num * 2)))
+                  (num_total_miss, pos_sample_num * 2, num_total_miss / (pos_sample_num * 2)))
 
     def data_generator(self):
         """
@@ -259,8 +247,7 @@ class ErnieDataReader(object):
 
                         sample_generator = self.read_file(file)
                         if not self.is_test and self.generate_neg_sample:
-                            sample_generator = self.mixin_negtive_samples(
-                                sample_generator)
+                            sample_generator = self.mixin_negtive_samples(sample_generator)
                         for sample in sample_generator:
                             if sample is None:
                                 continue
@@ -277,25 +264,22 @@ class ErnieDataReader(object):
                         total_token_num += len(token_ids)
                     else:
                         yield batch, total_token_num
-                        batch, total_token_num, max_len = [parsed_line], len(
-                            token_ids), len(token_ids)
+                        batch, total_token_num, max_len = [parsed_line], len(token_ids), len(token_ids)
 
                 if len(batch) > 0:
                     yield batch, total_token_num
 
-            for batch_data, total_token_num in batch_reader(reader,
-                                                            self.batch_size):
-                yield prepare_batch_data(
-                    batch_data,
-                    total_token_num,
-                    voc_size=self.voc_size,
-                    pad_id=self.pad_id,
-                    cls_id=self.cls_id,
-                    sep_id=self.sep_id,
-                    mask_id=self.mask_id,
-                    return_input_mask=True,
-                    return_max_len=False,
-                    return_num_token=False)
+            for batch_data, total_token_num in batch_reader(reader, self.batch_size):
+                yield prepare_batch_data(batch_data,
+                                         total_token_num,
+                                         voc_size=self.voc_size,
+                                         pad_id=self.pad_id,
+                                         cls_id=self.cls_id,
+                                         sep_id=self.sep_id,
+                                         mask_id=self.mask_id,
+                                         return_input_mask=True,
+                                         return_max_len=False,
+                                         return_num_token=False)
 
         return wrapper
 

@@ -46,8 +46,7 @@ class Tree(object):
     def build_tree(self):
         """Build the tree"""
         self.nodes = []
-        for index, (word, head, deprel) in enumerate(
-                zip(self.words, self.heads, self.deprels)):
+        for index, (word, head, deprel) in enumerate(zip(self.words, self.heads, self.deprels)):
             node = Node(index, word, head, deprel)
             self.nodes.append(node)
         # set root
@@ -119,10 +118,7 @@ class FineGrainedInfo(Tree):
             elif cnode.deprel == 'DOB':
                 os.append(cnode.word)
 
-        if len(
-                vs
-        ) == 1 and ss and not os and node.deprel == 'ATT' and self.nodes[
-                node.parent].deprel == 'VOB':
+        if len(vs) == 1 and ss and not os and node.deprel == 'ATT' and self.nodes[node.parent].deprel == 'VOB':
             os.append(self.nodes[node.parent].word)
 
         if not (ss or os):
@@ -175,9 +171,7 @@ class FineGrainedInfo(Tree):
 
         for cid in node.lefts + node.rights:
             cnode = self.nodes[cid]
-            if cnode.deprel == 'ADV' and (
-                    not cnode.rights
-                    or self.nodes[cnode.rights[0]].deprel != 'POB'):
+            if cnode.deprel == 'ADV' and (not cnode.rights or self.nodes[cnode.rights[0]].deprel != 'POB'):
                 advs.append(cnode.word)
                 for coo_word in self.process_coo(cnode):
                     advs.append(coo_word)
@@ -197,10 +191,8 @@ class FineGrainedInfo(Tree):
             for cid in pnode.lefts + pnode.rights:
                 cnode = self.nodes[cid]
                 if cnode.deprel == 'SBV':
-                    return [((cnode.word, pnode.word,
-                              self.nodes[node.rights[0]].word), "SVO")]
-            return [((None, pnode.word, self.nodes[node.rights[0]].word),
-                     "SVO")]
+                    return [((cnode.word, pnode.word, self.nodes[node.rights[0]].word), "SVO")]
+            return [((None, pnode.word, self.nodes[node.rights[0]].word), "SVO")]
         else:
             return []
 
@@ -212,16 +204,13 @@ class FineGrainedInfo(Tree):
             for cid in pnode.lefts:
                 cnode = self.nodes[cid]
                 if cnode.deprel == 'SBV':
-                    outputs += [((self.nodes[node.rights[0]].word, pnode.word,
-                                  cnode.word), "SVO")]
+                    outputs += [((self.nodes[node.rights[0]].word, pnode.word, cnode.word), "SVO")]
             if not outputs:
-                outputs += [((self.nodes[node.rights[0]].word, pnode.word,
-                              None), "SVO")]
+                outputs += [((self.nodes[node.rights[0]].word, pnode.word, None), "SVO")]
             for cid in pnode.rights:
                 cnode = self.nodes[cid]
                 if cnode.deprel == 'VOB':
-                    outputs += [((self.nodes[node.rights[0]].word, pnode.word,
-                                  cnode.word), "SVO")]
+                    outputs += [((self.nodes[node.rights[0]].word, pnode.word, cnode.word), "SVO")]
             return outputs
         elif node.deprel == "POB" and node.word == "被":
             for cid in pnode.lefts:
@@ -322,12 +311,9 @@ class FineGrainedInfo(Tree):
         outputs = []
         parent_id = node.parent
         if node.deprel == 'F':
-            if parent_id - 1 >= 0 and self.nodes[
-                    parent_id -
-                    1].deprel == 'MT' and self.nodes[parent_id -
-                                                     1].parent == parent_id:
-                outputs.append(((self.nodes[parent_id - 1].word,
-                                 self.nodes[parent_id].word, node.word), "F"))
+            if parent_id - 1 >= 0 and self.nodes[parent_id - 1].deprel == 'MT' and self.nodes[parent_id -
+                                                                                              1].parent == parent_id:
+                outputs.append(((self.nodes[parent_id - 1].word, self.nodes[parent_id].word, node.word), "F"))
             else:
                 outputs.append(((self.nodes[parent_id].word, node.word), "F"))
         return outputs
@@ -412,10 +398,7 @@ class CoarseGrainedInfo(Tree):
             elif cnode.deprel == 'DOB':
                 os.append(self.process_sub_term(cnode))
 
-        if len(
-                vs
-        ) == 1 and ss and not os and node.deprel == 'ATT' and self.nodes[
-                node.parent].deprel == 'VOB':
+        if len(vs) == 1 and ss and not os and node.deprel == 'ATT' and self.nodes[node.parent].deprel == 'VOB':
             os.append(self.nodes[node.parent].word)
 
         if not (ss or os):
@@ -466,9 +449,7 @@ class CoarseGrainedInfo(Tree):
 
         for cid in node.lefts + node.rights:
             cnode = self.nodes[cid]
-            if cnode.deprel == 'ADV' and (
-                    not cnode.rights
-                    or self.nodes[cnode.rights[0]].deprel != 'POB'):
+            if cnode.deprel == 'ADV' and (not cnode.rights or self.nodes[cnode.rights[0]].deprel != 'POB'):
                 advs.append(self.process_sub_term(cnode))
                 for coo_word in self.process_coo(cnode):
                     advs.append(coo_word)
@@ -488,14 +469,9 @@ class CoarseGrainedInfo(Tree):
             for cid in pnode.lefts + pnode.rights:
                 cnode = self.nodes[cid]
                 if cnode.deprel == 'SBV':
-                    return [
-                        ((self.process_sub_term(cnode), pnode.word,
-                          self.process_sub_term(self.nodes[node.rights[0]])),
-                         "SVO")
-                    ]
-            return [((None, pnode.word,
-                      self.process_sub_term(self.nodes[node.rights[0]])),
-                     "SVO")]
+                    return [((self.process_sub_term(cnode), pnode.word,
+                              self.process_sub_term(self.nodes[node.rights[0]])), "SVO")]
+            return [((None, pnode.word, self.process_sub_term(self.nodes[node.rights[0]])), "SVO")]
         else:
             return []
 
@@ -507,34 +483,25 @@ class CoarseGrainedInfo(Tree):
             for cid in pnode.lefts:
                 cnode = self.nodes[cid]
                 if cnode.deprel == 'SBV':
-                    outputs += [
-                        ((self.process_sub_term(self.nodes[node.rights[0]]),
-                          pnode.word, self.process_sub_term(cnode)), "SVO")
-                    ]
+                    outputs += [((self.process_sub_term(self.nodes[node.rights[0]]), pnode.word,
+                                  self.process_sub_term(cnode)), "SVO")]
             if not outputs:
-                outputs += [
-                    ((self.process_sub_term(self.nodes[node.rights[0]]),
-                      pnode.word, None), "SVO")
-                ]
+                outputs += [((self.process_sub_term(self.nodes[node.rights[0]]), pnode.word, None), "SVO")]
             for cid in pnode.rights:
                 cnode = self.nodes[cid]
                 if cnode.deprel == 'VOB':
-                    outputs += [
-                        ((self.process_sub_term(self.nodes[node.rights[0]]),
-                          pnode.word, self.process_sub_term(cnode)), "SVO")
-                    ]
+                    outputs += [((self.process_sub_term(self.nodes[node.rights[0]]), pnode.word,
+                                  self.process_sub_term(cnode)), "SVO")]
             return outputs
         elif node.deprel == "POB" and node.word == "被":
             for cid in pnode.lefts:
                 cnode = self.nodes[cid]
                 if cnode.deprel == 'SBV':
-                    outputs += [((None, pnode.word,
-                                  self.process_sub_term(cnode)), "SVO")]
+                    outputs += [((None, pnode.word, self.process_sub_term(cnode)), "SVO")]
             for cid in pnode.rights:
                 cnode = self.nodes[cid]
                 if cnode.deprel == 'VOB':
-                    outputs += [((None, pnode.word,
-                                  self.process_sub_term(cnode)), "SVO")]
+                    outputs += [((None, pnode.word, self.process_sub_term(cnode)), "SVO")]
             return outputs
         else:
             return []
@@ -630,12 +597,9 @@ class CoarseGrainedInfo(Tree):
         outputs = []
         parent_id = node.parent
         if node.deprel == 'F':
-            if parent_id - 1 >= 0 and self.nodes[
-                    parent_id -
-                    1].deprel == 'MT' and self.nodes[parent_id -
-                                                     1].parent == parent_id:
-                outputs.append(((self.nodes[parent_id - 1].word,
-                                 self.nodes[parent_id].word, node.word), "F"))
+            if parent_id - 1 >= 0 and self.nodes[parent_id - 1].deprel == 'MT' and self.nodes[parent_id -
+                                                                                              1].parent == parent_id:
+                outputs.append(((self.nodes[parent_id - 1].word, self.nodes[parent_id].word, node.word), "F"))
             else:
                 outputs.append(((self.nodes[parent_id].word, node.word), "F"))
         return outputs

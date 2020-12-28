@@ -22,14 +22,7 @@ import numpy as np
 from six.moves import xrange
 
 
-def mask(batch_tokens,
-         seg_labels,
-         mask_word_tags,
-         total_token_num,
-         vocab_size,
-         CLS=1,
-         SEP=2,
-         MASK=3):
+def mask(batch_tokens, seg_labels, mask_word_tags, total_token_num, vocab_size, CLS=1, SEP=2, MASK=3):
     """
     Add mask for batch_tokens, return out, mask_label, mask_pos;
     Note: mask_pos responding the batch_tokens after padded;
@@ -100,8 +93,7 @@ def mask(batch_tokens,
                     # random replace
                     if token != SEP and token != CLS:
                         mask_label.append(sent[token_index])
-                        sent[token_index] = replace_ids[prob_index +
-                                                        token_index]
+                        sent[token_index] = replace_ids[prob_index + token_index]
                         mask_flag = True
                         mask_pos.append(sent_index * max_len + token_index)
                 else:
@@ -148,15 +140,11 @@ def prepare_batch_data(insts,
                                      MASK=mask_id)
 
     # Second step: padding
-    src_id, self_input_mask = pad_batch_data(out,
-                                             pad_idx=pad_id,
-                                             return_input_mask=True)
+    src_id, self_input_mask = pad_batch_data(out, pad_idx=pad_id, return_input_mask=True)
     pos_id = pad_batch_data(batch_pos_ids, pad_idx=pad_id)
     sent_id = pad_batch_data(batch_sent_ids, pad_idx=pad_id)
 
-    return_list = [
-        src_id, pos_id, sent_id, self_input_mask, mask_label, mask_pos, labels
-    ]
+    return_list = [src_id, pos_id, sent_id, self_input_mask, mask_label, mask_pos, labels]
 
     return return_list
 
@@ -179,23 +167,18 @@ def pad_batch_data(insts,
     # Any token included in dict can be used to pad, since the paddings' loss
     # will be masked out by weights and make no effect on parameter gradients.
 
-    inst_data = np.array(
-        [inst + list([pad_idx] * (max_len - len(inst))) for inst in insts])
+    inst_data = np.array([inst + list([pad_idx] * (max_len - len(inst))) for inst in insts])
     return_list += [inst_data.astype("int64").reshape([-1, max_len, 1])]
 
     # position data
     if return_pos:
-        inst_pos = np.array([
-            list(range(0, len(inst))) + [pad_idx] * (max_len - len(inst))
-            for inst in insts
-        ])
+        inst_pos = np.array([list(range(0, len(inst))) + [pad_idx] * (max_len - len(inst)) for inst in insts])
 
         return_list += [inst_pos.astype("int64").reshape([-1, max_len, 1])]
 
     if return_input_mask:
         # This is used to avoid attention on paddings.
-        input_mask_data = np.array(
-            [[1] * len(inst) + [0] * (max_len - len(inst)) for inst in insts])
+        input_mask_data = np.array([[1] * len(inst) + [0] * (max_len - len(inst)) for inst in insts])
         input_mask_data = np.expand_dims(input_mask_data, axis=-1)
         return_list += [input_mask_data.astype("float32")]
 

@@ -68,28 +68,27 @@ run_type_g.add_arg("do_prediction",     bool,   True,  "Whether to do prediction
 args = parser.parse_args()
 # yapf: enable.
 
+
 def main(args):
     ernie_config = ErnieConfig(args.ernie_config_path)
     ernie_config.print_config()
 
-    reader = ClassifyReader(
-        vocab_path=args.vocab_path,
-        label_map_config=args.label_map_config,
-        max_seq_len=args.max_seq_len,
-        do_lower_case=args.do_lower_case,
-        in_tokens=False,
-        is_inference=True)
+    reader = ClassifyReader(vocab_path=args.vocab_path,
+                            label_map_config=args.label_map_config,
+                            max_seq_len=args.max_seq_len,
+                            do_lower_case=args.do_lower_case,
+                            in_tokens=False,
+                            is_inference=True)
 
     predict_prog = fluid.Program()
     predict_startup = fluid.Program()
     with fluid.program_guard(predict_prog, predict_startup):
         with fluid.unique_name.guard():
-            predict_pyreader, probs, feed_target_names = create_model(
-                args,
-                pyreader_name='predict_reader',
-                ernie_config=ernie_config,
-                is_classify=True,
-                is_prediction=True)
+            predict_pyreader, probs, feed_target_names = create_model(args,
+                                                                      pyreader_name='predict_reader',
+                                                                      ernie_config=ernie_config,
+                                                                      is_classify=True,
+                                                                      is_prediction=True)
 
     predict_prog = predict_prog.clone(for_test=True)
 
@@ -114,11 +113,7 @@ def main(args):
     dir_name = ckpt_dir + '_inference_model'
     model_path = os.path.join(args.save_inference_model_path, dir_name)
     print("save inference model to %s" % model_path)
-    fluid.io.save_inference_model(
-        model_path,
-        feed_target_names, [probs],
-        exe,
-        main_program=predict_prog)
+    fluid.io.save_inference_model(model_path, feed_target_names, [probs], exe, main_program=predict_prog)
 
     # Set config
     #config = AnalysisConfig(args.model_dir)
@@ -131,21 +126,20 @@ def main(args):
     # Create PaddlePredictor
     predictor = create_paddle_predictor(config)
 
-    predict_data_generator = reader.data_generator(
-        input_file=args.predict_set,
-        batch_size=args.batch_size,
-        epoch=1,
-        shuffle=False)
+    predict_data_generator = reader.data_generator(input_file=args.predict_set,
+                                                   batch_size=args.batch_size,
+                                                   epoch=1,
+                                                   shuffle=False)
 
     print("-------------- prediction results --------------")
     np.set_printoptions(precision=4, suppress=True)
     index = 0
     total_time = 0
     for sample in predict_data_generator():
-        src_ids    = sample[0]
-        sent_ids   = sample[1]
-        pos_ids    = sample[2]
-        task_ids   = sample[3]
+        src_ids = sample[0]
+        sent_ids = sample[1]
+        pos_ids = sample[2]
+        task_ids = sample[3]
         input_mask = sample[4]
 
         inputs = [array2tensor(ndarray) for ndarray in [src_ids, sent_ids, pos_ids, input_mask]]
@@ -159,11 +153,12 @@ def main(args):
         print(output.name)
         output_data = output.data.float_data()
         #assert len(output_data) == args.num_labels * args.batch_size
-        batch_result  = np.array(output_data).reshape((-1, args.num_labels))
+        batch_result = np.array(output_data).reshape((-1, args.num_labels))
         for single_example_probs in batch_result:
             print("{} example\t{}".format(index, single_example_probs))
             index += 1
-    print("qps:{}\ttotal_time:{}\ttotal_example:{}\tbatch_size:{}".format(index/total_time, total_time, index, args.batch_size))
+    print("qps:{}\ttotal_time:{}\ttotal_example:{}\tbatch_size:{}".format(index / total_time, total_time, index,
+                                                                          args.batch_size))
 
 
 def array2tensor(ndarray):
@@ -181,6 +176,7 @@ def array2tensor(ndarray):
 
     tensor.data = PaddleBuf(ndarray.flatten().tolist())
     return tensor
+
 
 if __name__ == '__main__':
     print_arguments(args)

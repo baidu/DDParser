@@ -31,20 +31,16 @@ class GraphAttentionLayer(object):
         self.out_features = out_features
         self.alpha = alpha
         self.concat = concat
-        self.a1 = layers.create_parameter(shape=[out_features, 1],
-                                          dtype='float32')
-        self.a2 = layers.create_parameter(shape=[out_features, 1],
-                                          dtype='float32')
+        self.a1 = layers.create_parameter(shape=[out_features, 1], dtype='float32')
+        self.a2 = layers.create_parameter(shape=[out_features, 1], dtype='float32')
 
     def forward(self, input, adj):
         """Forward network"""
         h = layers.fc(input, size=self.out_features, num_flatten_dims=2)
 
         _, N, _ = h.shape
-        middle_result1 = layers.expand(layers.matmul(h, self.a1),
-                                       expand_times=(1, 1, N))
-        middle_result2 = layers.transpose(layers.expand(
-            layers.matmul(h, self.a2), expand_times=(1, 1, N)),
+        middle_result1 = layers.expand(layers.matmul(h, self.a1), expand_times=(1, 1, N))
+        middle_result2 = layers.transpose(layers.expand(layers.matmul(h, self.a2), expand_times=(1, 1, N)),
                                           perm=[0, 2, 1])
         e = layers.leaky_relu(middle_result1 + middle_result2, self.alpha)
         adj = layers.cast(adj, dtype='int32')
@@ -60,27 +56,21 @@ class GraphAttentionLayer(object):
 
 class GAT(object):
     """GAT"""
-    def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads, layer):
+    def __init__(self, input_size, hidden_size, output_size, dropout, alpha, heads, layer):
         self.dropout = dropout
         self.layer = layer
         if self.layer == 1:
             self.attentions = [
-                GraphAttentionLayer(nfeat,
-                                    nclass,
-                                    dropout=dropout,
-                                    alpha=alpha,
-                                    concat=True) for _ in range(nheads)
+                GraphAttentionLayer(input_size, output_size, dropout=dropout, alpha=alpha, concat=True)
+                for _ in range(heads)
             ]
         else:
             self.attentions = [
-                GraphAttentionLayer(nfeat,
-                                    nhid,
-                                    dropout=dropout,
-                                    alpha=alpha,
-                                    concat=True) for _ in range(nheads)
+                GraphAttentionLayer(input_size, hidden_size, dropout=dropout, alpha=alpha, concat=True)
+                for _ in range(heads)
             ]
-            self.out_att = GraphAttentionLayer(nhid * nheads,
-                                               nclass,
+            self.out_att = GraphAttentionLayer(hidden_size * heads,
+                                               output_size,
                                                dropout=dropout,
                                                alpha=alpha,
                                                concat=False)
@@ -90,13 +80,11 @@ class GAT(object):
 
         x = layers.dropout(x, self.dropout)
         if self.layer == 1:
-            x = layers.stack([att.forward(x, adj) for att in self.attentions],
-                             dim=2)
+            x = layers.stack([att.forward(x, adj) for att in self.attentions], dim=2)
             x = layers.reduce_sum(x, 2)
             x = layers.dropout(x, self.dropout)
             return layers.log_softmax(x, axis=2)
         else:
-            x = layers.concat([att.forward(x, adj) for att in self.attentions],
-                              axis=2)
+            x = layers.concat([att.forward(x, adj) for att in self.attentions], axis=2)
             x = layers.dropout(x, self.dropout)
             return self.out_att.forward(x, adj)

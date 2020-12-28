@@ -35,54 +35,44 @@ import tokenization
 
 
 def create_model(args, pyreader_name, ernie_config, is_training):
-    pyreader = fluid.layers.py_reader(
-        capacity=50,
-        shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, 1], [-1, 1], [-1, 1], [-1, 1]],
-        dtypes=[
-            'int64', 'int64', 'int64', 'int64', 'float32', 'int64', 'int64',
-            'int64'
-        ],
-        lod_levels=[0, 0, 0, 0, 0, 0, 0, 0],
-        name=pyreader_name,
-        use_double_buffer=True)
-    (src_ids, sent_ids, pos_ids, task_ids, input_mask, start_positions,
-     end_positions, unique_id) = fluid.layers.read_file(pyreader)
+    pyreader = fluid.layers.py_reader(capacity=50,
+                                      shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
+                                              [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
+                                              [-1, args.max_seq_len, 1], [-1, 1], [-1, 1], [-1, 1]],
+                                      dtypes=['int64', 'int64', 'int64', 'int64', 'float32', 'int64', 'int64', 'int64'],
+                                      lod_levels=[0, 0, 0, 0, 0, 0, 0, 0],
+                                      name=pyreader_name,
+                                      use_double_buffer=True)
+    (src_ids, sent_ids, pos_ids, task_ids, input_mask, start_positions, end_positions,
+     unique_id) = fluid.layers.read_file(pyreader)
 
-    ernie = ErnieModel(
-        src_ids=src_ids,
-        position_ids=pos_ids,
-        sentence_ids=sent_ids,
-        task_ids=task_ids,
-        input_mask=input_mask,
-        config=ernie_config,
-        use_fp16=args.use_fp16)
+    ernie = ErnieModel(src_ids=src_ids,
+                       position_ids=pos_ids,
+                       sentence_ids=sent_ids,
+                       task_ids=task_ids,
+                       input_mask=input_mask,
+                       config=ernie_config,
+                       use_fp16=args.use_fp16)
 
     enc_out = ernie.get_sequence_output()
-    enc_out = fluid.layers.dropout(
-        x=enc_out, dropout_prob=0.1, dropout_implementation="upscale_in_train")
+    enc_out = fluid.layers.dropout(x=enc_out, dropout_prob=0.1, dropout_implementation="upscale_in_train")
 
-    logits = fluid.layers.fc(
-        input=enc_out,
-        size=2,
-        num_flatten_dims=2,
-        param_attr=fluid.ParamAttr(
-            name="cls_mrc_out_w",
-            initializer=fluid.initializer.TruncatedNormal(scale=0.02)),
-        bias_attr=fluid.ParamAttr(
-            name="cls_mrc_out_b", initializer=fluid.initializer.Constant(0.)))
+    logits = fluid.layers.fc(input=enc_out,
+                             size=2,
+                             num_flatten_dims=2,
+                             param_attr=fluid.ParamAttr(name="cls_mrc_out_w",
+                                                        initializer=fluid.initializer.TruncatedNormal(scale=0.02)),
+                             bias_attr=fluid.ParamAttr(name="cls_mrc_out_b",
+                                                       initializer=fluid.initializer.Constant(0.)))
 
     logits = fluid.layers.transpose(x=logits, perm=[2, 0, 1])
     start_logits, end_logits = fluid.layers.unstack(x=logits, axis=0)
 
-    batch_ones = fluid.layers.fill_constant_batch_size_like(
-        input=start_logits, dtype='int64', shape=[1], value=1)
+    batch_ones = fluid.layers.fill_constant_batch_size_like(input=start_logits, dtype='int64', shape=[1], value=1)
     num_seqs = fluid.layers.reduce_sum(input=batch_ones)
 
     def compute_loss(logits, positions):
-        loss = fluid.layers.softmax_with_cross_entropy(
-            logits=logits, label=positions)
+        loss = fluid.layers.softmax_with_cross_entropy(logits=logits, label=positions)
         loss = fluid.layers.mean(x=loss)
         return loss
 
@@ -129,44 +119,36 @@ def evaluate(exe,
     output_dir = args.checkpoints
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    output_prediction_file = os.path.join(output_dir,
-                                          eval_phase + "_predictions.json")
-    output_nbest_file = os.path.join(output_dir,
-                                     eval_phase + "_nbest_predictions.json")
+    output_prediction_file = os.path.join(output_dir, eval_phase + "_predictions.json")
+    output_nbest_file = os.path.join(output_dir, eval_phase + "_nbest_predictions.json")
 
-    RawResult = collections.namedtuple(
-        "RawResult", ["unique_id", "start_logits", "end_logits"])
+    RawResult = collections.namedtuple("RawResult", ["unique_id", "start_logits", "end_logits"])
 
     test_pyreader.start()
     all_results = []
     time_begin = time.time()
 
     fetch_list = [
-        graph_vars["unique_id"].name, graph_vars["start_logits"].name,
-        graph_vars["end_logits"].name, graph_vars["num_seqs"].name
+        graph_vars["unique_id"].name, graph_vars["start_logits"].name, graph_vars["end_logits"].name,
+        graph_vars["num_seqs"].name
     ]
     while True:
         try:
-            np_unique_ids, np_start_logits, np_end_logits, np_num_seqs = exe.run(
-                program=test_program, fetch_list=fetch_list)
+            np_unique_ids, np_start_logits, np_end_logits, np_num_seqs = exe.run(program=test_program,
+                                                                                 fetch_list=fetch_list)
             for idx in range(np_unique_ids.shape[0]):
                 if len(all_results) % 1000 == 0:
                     print("Processing example: %d" % len(all_results))
                 unique_id = int(np_unique_ids[idx])
                 start_logits = [float(x) for x in np_start_logits[idx].flat]
                 end_logits = [float(x) for x in np_end_logits[idx].flat]
-                all_results.append(
-                    RawResult(
-                        unique_id=unique_id,
-                        start_logits=start_logits,
-                        end_logits=end_logits))
+                all_results.append(RawResult(unique_id=unique_id, start_logits=start_logits, end_logits=end_logits))
 
         except fluid.core.EOFException:
             test_pyreader.reset()
             break
 
-    write_predictions(examples, features, all_results, args.n_best_size,
-                      args.max_answer_length, args.do_lower_case,
+    write_predictions(examples, features, all_results, args.n_best_size, args.max_answer_length, args.do_lower_case,
                       output_prediction_file, output_nbest_file)
 
     if eval_phase.find("dev") != -1:
@@ -179,14 +161,12 @@ def evaluate(exe,
     time_end = time.time()
     elapsed_time = time_end - time_begin
 
-    print(
-        "[%s evaluation] em: %f, f1: %f, avg: %f, questions: %d, elapsed time: %f"
-        % (eval_phase, em, f1, avg, total, elapsed_time))
+    print("[%s evaluation] em: %f, f1: %f, avg: %f, questions: %d, elapsed time: %f" %
+          (eval_phase, em, f1, avg, total, elapsed_time))
 
 
-def write_predictions(all_examples, all_features, all_results, n_best_size,
-                      max_answer_length, do_lower_case, output_prediction_file,
-                      output_nbest_file):
+def write_predictions(all_examples, all_features, all_results, n_best_size, max_answer_length, do_lower_case,
+                      output_prediction_file, output_nbest_file):
     """Write final predictions to the json file and log-odds of null if needed."""
     print("Writing predictions to: %s" % (output_prediction_file))
     print("Writing nbest to: %s" % (output_nbest_file))
@@ -200,10 +180,7 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
         unique_id_to_result[result.unique_id] = result
 
     _PrelimPrediction = collections.namedtuple(  # pylint: disable=invalid-name
-        "PrelimPrediction", [
-            "feature_index", "start_index", "end_index", "start_logit",
-            "end_logit"
-        ])
+        "PrelimPrediction", ["feature_index", "start_index", "end_index", "start_logit", "end_logit"])
 
     all_predictions = collections.OrderedDict()
     all_nbest_json = collections.OrderedDict()
@@ -239,17 +216,13 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
                     if length > max_answer_length:
                         continue
                     prelim_predictions.append(
-                        _PrelimPrediction(
-                            feature_index=feature_index,
-                            start_index=start_index,
-                            end_index=end_index,
-                            start_logit=result.start_logits[start_index],
-                            end_logit=result.end_logits[end_index]))
+                        _PrelimPrediction(feature_index=feature_index,
+                                          start_index=start_index,
+                                          end_index=end_index,
+                                          start_logit=result.start_logits[start_index],
+                                          end_logit=result.end_logits[end_index]))
 
-        prelim_predictions = sorted(
-            prelim_predictions,
-            key=lambda x: (x.start_logit + x.end_logit),
-            reverse=True)
+        prelim_predictions = sorted(prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True)
 
         _NbestPrediction = collections.namedtuple(  # pylint: disable=invalid-name
             "NbestPrediction", ["text", "start_logit", "end_logit"])
@@ -261,12 +234,10 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
                 break
             feature = features[pred.feature_index]
             if pred.start_index > 0:  # this is a non-null prediction
-                tok_tokens = feature.tokens[pred.start_index:(pred.end_index + 1
-                                                              )]
+                tok_tokens = feature.tokens[pred.start_index:(pred.end_index + 1)]
                 orig_doc_start = feature.token_to_orig_map[pred.start_index]
                 orig_doc_end = feature.token_to_orig_map[pred.end_index]
-                orig_tokens = example.doc_tokens[orig_doc_start:(orig_doc_end +
-                                                                 1)]
+                orig_tokens = example.doc_tokens[orig_doc_start:(orig_doc_end + 1)]
                 tok_text = " ".join(tok_tokens)
 
                 # De-tokenize WordPieces that have been split off.
@@ -287,18 +258,12 @@ def write_predictions(all_examples, all_features, all_results, n_best_size,
                 final_text = ""
                 seen_predictions[final_text] = True
 
-            nbest.append(
-                _NbestPrediction(
-                    text=final_text,
-                    start_logit=pred.start_logit,
-                    end_logit=pred.end_logit))
+            nbest.append(_NbestPrediction(text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit))
 
         # In very rare edge cases we could have no valid predictions. So we
         # just create a nonce prediction in this case to avoid failure.
         if not nbest:
-            nbest.append(
-                _NbestPrediction(
-                    text="empty", start_logit=0.0, end_logit=0.0))
+            nbest.append(_NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
 
         total_scores = []
         best_non_null_entry = None
@@ -416,8 +381,7 @@ def get_final_text(pred_text, orig_text, do_lower_case):
 
 def _get_best_indexes(logits, n_best_size):
     """Get the n-best logits from a list."""
-    index_and_score = sorted(
-        enumerate(logits), key=lambda x: x[1], reverse=True)
+    index_and_score = sorted(enumerate(logits), key=lambda x: x[1], reverse=True)
 
     best_indexes = []
     for i in range(len(index_and_score)):
