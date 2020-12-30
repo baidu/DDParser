@@ -90,6 +90,7 @@ class FineGrainedInfo(Tree):
             struct_results += self.process_f(node)
             struct_results += self.process_ic(node)
             struct_results += self.process_hed(node)
+            struct_results += self.process_dob(node)
             struct_results += bb_structs
         if not struct_results:
             struct_results = self.process_phrase()
@@ -118,17 +119,10 @@ class FineGrainedInfo(Tree):
             elif cnode.deprel == 'COO' and cnode.word != node.word:
                 vs.append(cnode.word)
             elif cnode.deprel == 'DOB':
-                os.append(cnode.word)
+                return []
 
         if len(vs) == 1 and ss and not os and node.deprel == 'ATT' and self.nodes[node.parent].deprel == 'VOB':
             os.append(self.nodes[node.parent].word)
-
-        if not (ss or os):
-            for cid in node.rights:
-                cnode = self.nodes[cid]
-                if cnode.deprel == 'VOB':
-                    os.append(cnode.word)
-                    os += self.process_coo(cnode)
 
         if ss and os:
             for s in ss:
@@ -190,11 +184,19 @@ class FineGrainedInfo(Tree):
         """处理BA标签"""
         if node.deprel == "POB" and node.word in self.ba and len(node.rights) == 1:
             pnode = self.nodes[node.parent]
-            for cid in pnode.lefts + pnode.rights:
-                cnode = self.nodes[cid]
-                if cnode.deprel == 'SBV':
-                    return [((cnode.word, pnode.word, self.nodes[node.rights[0]].word), "SVO")]
-            return [((None, pnode.word, self.nodes[node.rights[0]].word), "SVO")]
+            if pnode.rights and self.nodes[pnode.rights[0]].deprel == "VOB":
+                for cid in pnode.lefts + pnode.rights:
+                    cnode = self.nodes[cid]
+                    if cnode.deprel == 'SBV':
+                        return [((cnode.word, pnode.word, self.nodes[pnode.rights[0]].word,
+                                  self.nodes[node.rights[0]].word), "DOB")]
+                return [((None, pnode.word, self.nodes[pnode.rights[0]].word, self.nodes[node.rights[0]].word), "DOB")]
+            else:
+                for cid in pnode.lefts + pnode.rights:
+                    cnode = self.nodes[cid]
+                    if cnode.deprel == 'SBV':
+                        return [((cnode.word, pnode.word, self.nodes[node.rights[0]].word), "SVO")]
+                return [((None, pnode.word, self.nodes[node.rights[0]].word), "SVO")]
         else:
             return []
 
@@ -202,17 +204,24 @@ class FineGrainedInfo(Tree):
         """处理BEI标签"""
         outputs = []
         pnode = self.nodes[node.parent]
-        if node.deprel == "POB" and node.word in self.bei and len(node.rights) == 1:
+        if node.deprel == "POB" and node.word in self.bei and pnode.rights and self.nodes[
+                pnode.rights[0]].deprel == 'VOB':
+            _subject = self.nodes[node.rights[0]].word if node.rights else None
+            for cid in pnode.lefts:
+                cnode = self.nodes[cid]
+                if cnode.deprel == 'SBV':
+                    outputs += [((_subject, pnode.word, self.nodes[pnode.rights[0]].word, cnode.word), "DOB")]
+            if not outputs:
+                outputs += [((_subject, pnode.word, self.nodes[pnode.rights[0]].word, None), "DOB")]
+
+            return outputs
+        elif node.deprel == "POB" and node.word in self.bei and len(node.rights) == 1:
             for cid in pnode.lefts:
                 cnode = self.nodes[cid]
                 if cnode.deprel == 'SBV':
                     outputs += [((self.nodes[node.rights[0]].word, pnode.word, cnode.word), "SVO")]
             if not outputs:
                 outputs += [((self.nodes[node.rights[0]].word, pnode.word, None), "SVO")]
-            for cid in pnode.rights:
-                cnode = self.nodes[cid]
-                if cnode.deprel == 'VOB':
-                    outputs += [((self.nodes[node.rights[0]].word, pnode.word, cnode.word), "SVO")]
             return outputs
         elif node.deprel == "POB" and node.word in self.bei:
             for cid in pnode.lefts:
@@ -346,6 +355,33 @@ class FineGrainedInfo(Tree):
             outputs.append(((node.word, ), "Phrase"))
         return outputs
 
+    def process_dob(self, node):
+        """处理DOB标签"""
+        vs = [node.word]
+        ss = []
+        os = []
+        outputs = []
+        for cid in node.lefts + node.rights:
+            cnode = self.nodes[cid]
+            if cnode.deprel == 'SBV':
+                ss.append(cnode.word)
+                ss += self.process_coo(cnode)
+            elif cnode.deprel == 'COO' and cnode.word != node.word:
+                vs.append(cnode.word)
+            elif cnode.deprel == 'DOB':
+                os.append(cnode.word)
+        if len(os) != 2:
+            return []
+        if ss:
+            for s in ss:
+                for v in vs:
+                    outputs.append(((s, v, os[0], os[1]), 'DOB'))
+        else:
+            for v in vs:
+                outputs.append(((None, v, os[0], os[1]), 'DOB'))
+
+        return outputs
+
 
 class CoarseGrainedInfo(Tree):
     """
@@ -370,6 +406,7 @@ class CoarseGrainedInfo(Tree):
             struct_results += self.process_f(node)
             struct_results += self.process_ic(node)
             struct_results += self.process_hed(node)
+            struct_results += self.process_dob(node)
             struct_results += bb_structs
         if not struct_results:
             struct_results = self.process_phrase()
@@ -381,7 +418,6 @@ class CoarseGrainedInfo(Tree):
         ss = []
         os = []
         outputs = []
-
         for cid in node.lefts + node.rights:
             cnode = self.nodes[cid]
             if flag and cnode.deprel == 'POB' and cnode.word in self.ba + self.bei:
@@ -398,17 +434,9 @@ class CoarseGrainedInfo(Tree):
             elif cnode.deprel == 'COO' and cnode.word != node.word:
                 vs.append(cnode.word)
             elif cnode.deprel == 'DOB':
-                os.append(self.process_sub_term(cnode))
-
+                return []
         if len(vs) == 1 and ss and not os and node.deprel == 'ATT' and self.nodes[node.parent].deprel == 'VOB':
             os.append(self.nodes[node.parent].word)
-
-        if not (ss or os):
-            for cid in node.rights:
-                cnode = self.nodes[cid]
-                if cnode.deprel == 'VOB':
-                    os.append(self.process_sub_term(cnode))
-                    os += self.process_coo(cnode)
 
         if ss and os:
             for s in ss:
@@ -468,12 +496,22 @@ class CoarseGrainedInfo(Tree):
         """处理BA标签"""
         if node.deprel == "POB" and node.word in self.ba and len(node.rights) == 1:
             pnode = self.nodes[node.parent]
-            for cid in pnode.lefts + pnode.rights:
-                cnode = self.nodes[cid]
-                if cnode.deprel == 'SBV':
-                    return [((self.process_sub_term(cnode), pnode.word,
-                              self.process_sub_term(self.nodes[node.rights[0]])), "SVO")]
-            return [((None, pnode.word, self.process_sub_term(self.nodes[node.rights[0]])), "SVO")]
+            if pnode.rights and self.nodes[pnode.rights[0]].deprel == "VOB":
+                for cid in pnode.lefts + pnode.rights:
+                    cnode = self.nodes[cid]
+                    if cnode.deprel == 'SBV':
+                        return [((self.process_sub_term(cnode), pnode.word,
+                                  self.process_sub_term(self.nodes[pnode.rights[0]]),
+                                  self.process_sub_term(self.nodes[node.rights[0]])), "DOB")]
+                return [((None, pnode.word, self.process_sub_term(self.nodes[pnode.rights[0]]),
+                          self.process_sub_term(self.nodes[node.rights[0]])), "DOB")]
+            else:
+                for cid in pnode.lefts + pnode.rights:
+                    cnode = self.nodes[cid]
+                    if cnode.deprel == 'SBV':
+                        return [((self.process_sub_term(cnode), pnode.word,
+                                  self.process_sub_term(self.nodes[node.rights[0]])), "SVO")]
+                return [((None, pnode.word, self.process_sub_term(self.nodes[node.rights[0]])), "SVO")]
         else:
             return []
 
@@ -481,7 +519,18 @@ class CoarseGrainedInfo(Tree):
         """处理BEI标签"""
         outputs = []
         pnode = self.nodes[node.parent]
-        if node.deprel == "POB" and node.word in self.bei and len(node.rights) == 1:
+        if node.deprel == "POB" and node.word in self.bei and pnode.rights and self.nodes[
+                pnode.rights[0]].deprel == 'VOB':
+            _subject = self.process_sub_term(self.nodes[node.rights[0]]) if node.rights else None
+            for cid in pnode.lefts:
+                cnode = self.nodes[cid]
+                if cnode.deprel == 'SBV':
+                    outputs += [((_subject, pnode.word, self.process_sub_term(self.nodes[pnode.rights[0]]),
+                                  self.process_sub_term(cnode)), "DOB")]
+            if not outputs:
+                outputs += [((_subject, pnode.word, self.process_sub_term(self.nodes[pnode.rights[0]]), None), "DOB")]
+            return outputs
+        elif node.deprel == "POB" and node.word in self.bei and len(node.rights) == 1:
             for cid in pnode.lefts:
                 cnode = self.nodes[cid]
                 if cnode.deprel == 'SBV':
@@ -489,11 +538,6 @@ class CoarseGrainedInfo(Tree):
                                   self.process_sub_term(cnode)), "SVO")]
             if not outputs:
                 outputs += [((self.process_sub_term(self.nodes[node.rights[0]]), pnode.word, None), "SVO")]
-            for cid in pnode.rights:
-                cnode = self.nodes[cid]
-                if cnode.deprel == 'VOB':
-                    outputs += [((self.process_sub_term(self.nodes[node.rights[0]]), pnode.word,
-                                  self.process_sub_term(cnode)), "SVO")]
             return outputs
         elif node.deprel == "POB" and node.word in self.bei:
             for cid in pnode.lefts:
@@ -682,6 +726,32 @@ class CoarseGrainedInfo(Tree):
                 rf_list += self.inorder_traversal(self.nodes[rn])
 
         return lf_list + [(node.word, node.deprel)] + rf_list
+
+    def process_dob(self, node):
+        """获取DOB标签"""
+        vs = [node.word]
+        ss = []
+        os = []
+        outputs = []
+        for cid in node.lefts + node.rights:
+            cnode = self.nodes[cid]
+            if cnode.deprel == 'SBV':
+                ss.append(self.process_sub_term(cnode))
+                ss += self.process_coo(cnode)
+            elif cnode.deprel == 'COO' and cnode.word != node.word:
+                vs.append(cnode.word)
+            elif cnode.deprel == 'DOB':
+                os.append(self.process_sub_term(cnode))
+        if len(os) != 2:
+            return []
+        if ss:
+            for s in ss:
+                for v in vs:
+                    outputs.append(((s, v, os[0], os[1]), 'DOB'))
+        else:
+            for v in vs:
+                outputs.append(((None, v, os[0], os[1]), 'DOB'))
+        return outputs
 
 
 if __name__ == "__main__":
