@@ -42,6 +42,8 @@ class Tree(object):
         self.deprels = ddp_res['deprel']
         # self.postags = ddp_res['postag']
         self.build_tree()
+        self.ba = ["把", "将"]
+        self.bei = ["被"]
 
     def build_tree(self):
         """Build the tree"""
@@ -102,7 +104,7 @@ class FineGrainedInfo(Tree):
 
         for cid in node.lefts + node.rights:
             cnode = self.nodes[cid]
-            if flag and cnode.deprel == 'POB' and cnode.word in ['把', '被']:
+            if flag and cnode.deprel == 'POB' and cnode.word in self.ba + self.bei:
                 ss = []
                 break
             if cnode.deprel == 'DBL':
@@ -186,7 +188,7 @@ class FineGrainedInfo(Tree):
 
     def process_ba(self, node):
         """处理BA标签"""
-        if node.deprel == "POB" and node.word == "把" and len(node.rights) == 1:
+        if node.deprel == "POB" and node.word in self.ba and len(node.rights) == 1:
             pnode = self.nodes[node.parent]
             for cid in pnode.lefts + pnode.rights:
                 cnode = self.nodes[cid]
@@ -200,7 +202,7 @@ class FineGrainedInfo(Tree):
         """处理BEI标签"""
         outputs = []
         pnode = self.nodes[node.parent]
-        if node.deprel == "POB" and node.word == "被" and len(node.rights) == 1:
+        if node.deprel == "POB" and node.word in self.bei and len(node.rights) == 1:
             for cid in pnode.lefts:
                 cnode = self.nodes[cid]
                 if cnode.deprel == 'SBV':
@@ -212,7 +214,7 @@ class FineGrainedInfo(Tree):
                 if cnode.deprel == 'VOB':
                     outputs += [((self.nodes[node.rights[0]].word, pnode.word, cnode.word), "SVO")]
             return outputs
-        elif node.deprel == "POB" and node.word == "被":
+        elif node.deprel == "POB" and node.word in self.bei:
             for cid in pnode.lefts:
                 cnode = self.nodes[cid]
                 if cnode.deprel == 'SBV':
@@ -382,7 +384,7 @@ class CoarseGrainedInfo(Tree):
 
         for cid in node.lefts + node.rights:
             cnode = self.nodes[cid]
-            if flag and cnode.deprel == 'POB' and cnode.word in ['把', '被']:
+            if flag and cnode.deprel == 'POB' and cnode.word in self.ba + self.bei:
                 ss = []
                 break
             if cnode.deprel == 'DBL':
@@ -464,7 +466,7 @@ class CoarseGrainedInfo(Tree):
 
     def process_ba(self, node):
         """处理BA标签"""
-        if node.deprel == "POB" and node.word == "把" and len(node.rights) == 1:
+        if node.deprel == "POB" and node.word in self.ba and len(node.rights) == 1:
             pnode = self.nodes[node.parent]
             for cid in pnode.lefts + pnode.rights:
                 cnode = self.nodes[cid]
@@ -479,7 +481,7 @@ class CoarseGrainedInfo(Tree):
         """处理BEI标签"""
         outputs = []
         pnode = self.nodes[node.parent]
-        if node.deprel == "POB" and node.word == "被" and len(node.rights) == 1:
+        if node.deprel == "POB" and node.word in self.bei and len(node.rights) == 1:
             for cid in pnode.lefts:
                 cnode = self.nodes[cid]
                 if cnode.deprel == 'SBV':
@@ -493,7 +495,7 @@ class CoarseGrainedInfo(Tree):
                     outputs += [((self.process_sub_term(self.nodes[node.rights[0]]), pnode.word,
                                   self.process_sub_term(cnode)), "SVO")]
             return outputs
-        elif node.deprel == "POB" and node.word == "被":
+        elif node.deprel == "POB" and node.word in self.bei:
             for cid in pnode.lefts:
                 cnode = self.nodes[cid]
                 if cnode.deprel == 'SBV':
