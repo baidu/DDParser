@@ -1,7 +1,8 @@
-## 基于句法分析的句子表示工具
-最近几年图神经网络(GNN)越来越多被应用到NLP任务，而DDParser可以输出句子的依存句法分析树，由于树是图的一种特例，那么很自然的可以将GNN和依存句法分析结果应用到句子表示上。<br>
+## 基于句法分析的隐式向量表示工具
+常用的句子表示模型（如序列表示模型LSTM）基于顺序上下文给出当前词的表示，其会受限于词之间的距离，对长距离上下文依赖变弱。句法分析从语法结构上给出当前词依赖的上下文，尤其可给出长距离依赖的上下文，其弥补常用句子表示模型的不足之处。<br>
+本工具将依存句法分析树看作一个有向无环图，在该图上应用基于图的注意力网络机制获取包含句法信息的表示。该向量表示与基于序列模型得到的向量表示连接在一起作为输入文本最终的向量表示，增强了输入文本的表示能力。<br>
 ### 实现原理
-本工具提出一种可以快速将依存句法分析特征应用到下游网络的方法。
+本工具提出一种可以快速将句法信息应用到下游网络的方法。
 * 第一步，利用DDParser对用户原始数据处理，得到依存句法分析结果。
 * 第二步，修改原始模型的Dataloader，利用本工具提供的接口得到文本的邻接矩阵<img src="https://latex.codecogs.com/svg.latex?\mathrm{A}">和核心词索引<img src="https://latex.codecogs.com/svg.latex?\mathrm{h}">。
 * 第三步，在模型得到句子的表示<img src="https://latex.codecogs.com/svg.latex?\mathrm{X}">后，修改模型结构引入图注意力网络([Graph Attention Networks, GAT](https://arxiv.org/abs/1710.10903))，将<img src="https://latex.codecogs.com/svg.latex?\mathrm{A}">和<img src="https://latex.codecogs.com/svg.latex?\mathrm{X}">作为GAT网络输入得到包含句子结构信息的句子表示<img src="https://latex.codecogs.com/svg.latex?\bar{X}">。 
