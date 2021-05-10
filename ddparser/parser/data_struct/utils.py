@@ -40,10 +40,8 @@ unk = '<unk>'
 bos = '<bos>'
 
 DOWNLOAD_MODEL_PATH_DICT = {
-    'lstm':
-    "https://ddparser.bj.bcebos.com/DDParser-char-lstm-0.1.2.tar.gz",
-    "transformer":
-    "https://ddparser.bj.bcebos.com/DDParser-char-transformer-0.1.2.tar.gz"
+    'lstm': "https://ddparser.bj.bcebos.com/DDParser-char-lstm-0.1.2.tar.gz",
+    "transformer": "https://ddparser.bj.bcebos.com/DDParser-char-transformer-0.1.2.tar.gz"
 }
 
 
@@ -197,9 +195,7 @@ class DepTree:
 
     def build_tree(self):
         """Build the tree"""
-        self.nodes = [
-            NODE(index, p_index) for index, p_index in enumerate(self.sentence)
-        ]
+        self.nodes = [NODE(index, p_index) for index, p_index in enumerate(self.sentence)]
         # set root
         self.root = self.nodes[0]
         for node in self.nodes[1:]:
@@ -255,14 +251,13 @@ def numericalize(sequence):
     return [int(i) for i in sequence]
 
 
-def init_log(
-        log_path,
-        devices,
-        level=logging.INFO,
-        when="D",
-        backup=7,
-        format="%(levelname)s: %(asctime)s: %(filename)s:%(lineno)d * %(thread)d %(message)s",
-        datefmt="%m-%d %H:%M:%S"):
+def init_log(log_path,
+             devices,
+             level=logging.INFO,
+             when="D",
+             backup=7,
+             format="%(levelname)s: %(asctime)s: %(filename)s:%(lineno)d * %(thread)d %(message)s",
+             datefmt="%m-%d %H:%M:%S"):
     """initialize log module"""
     formatter = logging.Formatter(format, datefmt)
     logger = logging.getLogger()
@@ -276,14 +271,16 @@ def init_log(
         if not os.path.isdir(dir):
             os.makedirs(dir)
 
-        handler = logging.handlers.TimedRotatingFileHandler(
-            log_path + str(devices) + ".log", when=when, backupCount=backup)
+        handler = logging.handlers.TimedRotatingFileHandler(log_path + str(devices) + ".log",
+                                                            when=when,
+                                                            backupCount=backup)
         handler.setLevel(level)
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-        handler = logging.handlers.TimedRotatingFileHandler(
-            log_path + str(devices) + ".log.wf", when=when, backupCount=backup)
+        handler = logging.handlers.TimedRotatingFileHandler(log_path + str(devices) + ".log.wf",
+                                                            when=when,
+                                                            backupCount=backup)
         handler.setLevel(logging.WARNING)
         handler.setFormatter(formatter)
         logger.addHandler(handler)
@@ -294,9 +291,7 @@ def download_model_from_url(path, model='lstm'):
     if os.path.exists(path):
         return
     download_model_path = DOWNLOAD_MODEL_PATH_DICT[model]
-    logging.info(
-        "The first run will download the pre-trained model, which will take some time, please be patient!"
-    )
+    logging.info("The first run will download the pre-trained model, which will take some time, please be patient!")
     dir_path = os.path.dirname(path)
     temp_path = dir_path + "_temp"
     file_path = os.path.join(temp_path, "model.tar.gz")
@@ -305,14 +300,8 @@ def download_model_from_url(path, model='lstm'):
     os.mkdir(temp_path)
     # downloding the model.
     context = ssl._create_unverified_context()
-    file_size = int(
-        urlopen(download_model_path,
-                context=context).info().get('Content-Length', -1))
-    pbar = tqdm(total=file_size,
-                initial=0,
-                unit='B',
-                unit_scale=True,
-                desc="loading ddparser model:")
+    file_size = int(urlopen(download_model_path, context=context).info().get('Content-Length', -1))
+    pbar = tqdm(total=file_size, initial=0, unit='B', unit_scale=True, desc="loading ddparser model:")
     req = requests.get(download_model_path, stream=True, verify=False)
     with (open(file_path, 'ab')) as f:
         for chunk in req.iter_content(chunk_size=1024):
@@ -329,8 +318,7 @@ def download_model_from_url(path, model='lstm'):
     # mv temp_path path
     for _, dirs, _ in os.walk(temp_path):
         if len(dirs) != 1:
-            raise RuntimeError("There is a problem with the model catalogue,"
-                               "please contact the author")
+            raise RuntimeError("There is a problem with the model catalogue," "please contact the author")
         shutil.move(os.path.join(temp_path, dirs[0]), path)
     # delete temp directory
     shutil.rmtree(temp_path)

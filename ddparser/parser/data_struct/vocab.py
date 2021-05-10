@@ -28,8 +28,7 @@ class Vocab(object):
         self.itos = list(specials) if specials else []
         self.stoi = defaultdict(lambda: unk_index)
         self.stoi.update({token: i for i, token in enumerate(self.itos)})
-        self.extend(
-            [token for token, freq in counter.items() if freq >= min_freq])
+        self.extend([token for token, freq in counter.items() if freq >= min_freq])
         self.unk_index = unk_index
         self.n_init = len(self)
 

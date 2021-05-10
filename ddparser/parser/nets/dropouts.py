@@ -30,7 +30,6 @@ class SharedDropout(dygraph.Layer):
         self.p = p
         self.batch_first = batch_first
 
-
     def forward(self, x):
         """Forward network"""
         if self.training and self.p > 0:
@@ -65,17 +64,10 @@ class IndependentDropout(dygraph.Layer):
     def forward(self, *items):
         """Forward network"""
         if self.training and self.p > 0:
-            masks = [
-                layers.uniform_random(shape=x.shape[:2], min=0, max=1) >=
-                self.p for x in items
-            ]
+            masks = [layers.uniform_random(shape=x.shape[:2], min=0, max=1) >= self.p for x in items]
             masks = [layers.cast(x, 'float32') for x in masks]
             total = layers.elementwise_add(*masks)
-            scale = len(items) / layers.elementwise_max(
-                total, layers.ones_like(total))
+            scale = len(items) / layers.elementwise_max(total, layers.ones_like(total))
             masks = [mask * scale for mask in masks]
-            items = [
-                item * layers.unsqueeze(mask, axes=[-1])
-                for item, mask in zip(items, masks)
-            ]
+            items = [item * layers.unsqueeze(mask, axes=[-1]) for item, mask in zip(items, masks)]
         return items

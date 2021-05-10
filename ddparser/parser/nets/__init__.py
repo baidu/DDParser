@@ -28,6 +28,6 @@ from .mlp import MLP
 from .rnn import BasicLSTMUnit
 
 __all__ = [
-    'BasicLSTMUnit', 'Biaffine', 'BiLSTM', 'CharLSTM', 'CharTransformer',
-    'IndependentDropout', 'MLP', 'SharedDropout', 'Transformer'
+    'BasicLSTMUnit', 'Biaffine', 'BiLSTM', 'CharLSTM', 'CharTransformer', 'IndependentDropout', 'MLP', 'SharedDropout',
+    'Transformer'
 ]

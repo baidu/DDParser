@@ -39,7 +39,6 @@ class CharLSTM(dygraph.Layer):
         # the lstm layer
         self.lstm = BiLSTM(input_size=n_embed, hidden_size=n_out // 2)
 
-
     def forward(self, x):
         """Forward network"""
         mask = layers.reduce_any(x != self.pad_index, -1)
@@ -50,6 +49,5 @@ class CharLSTM(dygraph.Layer):
 
         _, (h, _) = self.lstm(emb, char_mask, self.pad_index)
         h = layers.concat(layers.unstack(h), axis=-1)
-        feat_embed = nn.pad_sequence_paddle(
-            layers.split(h, lens.numpy().tolist(), dim=0), self.pad_index)
+        feat_embed = nn.pad_sequence_paddle(layers.split(h, lens.numpy().tolist(), dim=0), self.pad_index)
         return feat_embed

@@ -33,19 +33,13 @@ from ddparser.parser.nets import nn
 
 class TextDataLoader(object):
     """TextDataLoader"""
-    def __init__(self,
-                 dataset,
-                 batch_sampler,
-                 collate_fn,
-                 use_data_parallel=False,
-                 use_multiprocess=True):
+    def __init__(self, dataset, batch_sampler, collate_fn, use_data_parallel=False, use_multiprocess=True):
         self.dataset = dataset
         self.batch_sampler = batch_sampler
         self.fields = self.dataset.fields
         self.collate_fn = collate_fn
         self.use_data_parallel = use_data_parallel
-        self.dataloader = io.DataLoader.from_generator(
-            capacity=10, return_list=True, use_multiprocess=use_multiprocess)
+        self.dataloader = io.DataLoader.from_generator(capacity=10, return_list=True, use_multiprocess=use_multiprocess)
         self.dataloader.set_batch_generator(self.generator_creator())
         if use_data_parallel:
             self.dataloader = reader.distributed_batch_reader(self.dataloader)
@@ -59,16 +53,12 @@ class TextDataLoader(object):
         def __reader():
             for batch_sample_id in self.batch_sampler:
                 batch = []
-                raw_batch = self.collate_fn(
-                    [self.dataset[sample_id] for sample_id in batch_sample_id])
+                raw_batch = self.collate_fn([self.dataset[sample_id] for sample_id in batch_sample_id])
                 for data, field in zip(raw_batch, self.fields):
                     if isinstance(data[0], np.ndarray):
                         data = nn.pad_sequence(data, field.pad_index)
                     elif isinstance(data[0], Iterable):
-                        data = [
-                            nn.pad_sequence(f, field.pad_index)
-                            for f in zip(*data)
-                        ]
+                        data = [nn.pad_sequence(f, field.pad_index) for f in zip(*data)]
                     batch.append(data)
                 yield batch
 
@@ -93,8 +83,7 @@ class TextDataset(object):
                 self.fields.append(field)
 
         for field in self.fields:
-            setattr(self, field.name,
-                    field.transform(getattr(corpus, field.name)))
+            setattr(self, field.name, field.transform(getattr(corpus, field.name)))
 
         if n_buckets:
             self.lengths = [len(i) + int(bool(field.bos)) for i in corpus]
@@ -120,8 +109,7 @@ class BucketsSampler(object):
     def __init__(self, buckets, batch_size, shuffle=False):
         self.batch_size = batch_size
         self.shuffle = shuffle
-        self.sizes, self.buckets = zip(*[(size, bucket)
-                                         for size, bucket in buckets.items()])
+        self.sizes, self.buckets = zip(*[(size, bucket) for size, bucket in buckets.items()])
         # the number of chunks in each bucket, which is clipped by range [1, len(bucket)]
         self.chunks = []
         for size, bucket in zip(self.sizes, self.buckets):
@@ -133,10 +121,8 @@ class BucketsSampler(object):
         """Returns an iterator, randomly or sequentially returns a batch id"""
         range_fn = np.random.permutation if self.shuffle else np.arange
         for i in range_fn(len(self.buckets)).tolist():
-            split_sizes = [(len(self.buckets[i]) - j - 1) // self.chunks[i] + 1
-                           for j in range(self.chunks[i])]
-            for batch in np.split(range_fn(len(self.buckets[i])),
-                                  np.cumsum(split_sizes)):
+            split_sizes = [(len(self.buckets[i]) - j - 1) // self.chunks[i] + 1 for j in range(self.chunks[i])]
+            for batch in np.split(range_fn(len(self.buckets[i])), np.cumsum(split_sizes)):
                 if len(batch):
                     yield [self.buckets[i][j] for j in batch.tolist()]
 
@@ -172,12 +158,9 @@ def batchify(dataset,
              sequential_sampler=False):
     """Returns data loader"""
     if sequential_sampler:
-        batch_sampler = SequentialSampler(batch_size=batch_size,
-                                          corpus_length=len(dataset))
+        batch_sampler = SequentialSampler(batch_size=batch_size, corpus_length=len(dataset))
     else:
-        batch_sampler = BucketsSampler(buckets=dataset.buckets,
-                                       batch_size=batch_size,
-                                       shuffle=shuffle)
+        batch_sampler = BucketsSampler(buckets=dataset.buckets, batch_size=batch_size, shuffle=shuffle)
     loader = TextDataLoader(dataset=dataset,
                             batch_sampler=batch_sampler,
                             collate_fn=dataset.collate_fn,

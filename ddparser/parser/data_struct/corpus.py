@@ -25,10 +25,7 @@ from collections.abc import Iterable
 from ddparser.parser.data_struct import Field
 
 CoNLL = namedtuple(typename='CoNLL',
-                   field_names=[
-                       'ID', 'FORM', 'LEMMA', 'CPOS', 'POS', 'FEATS', 'HEAD',
-                       'DEPREL', 'PHEAD', 'PDEPREL'
-                   ])
+                   field_names=['ID', 'FORM', 'LEMMA', 'CPOS', 'POS', 'FEATS', 'HEAD', 'DEPREL', 'PHEAD', 'PDEPREL'])
 CoNLL.__new__.__defaults__ = tuple([None] * 10)
 
 
@@ -58,8 +55,7 @@ class Sentence(object):
 
     def __repr__(self):
         """repr"""
-        return '\n'.join('\t'.join(map(str, line))
-                         for line in zip(*self.values)) + '\n'
+        return '\n'.join('\t'.join(map(str, line)) for line in zip(*self.values)) + '\n'
 
     def get_result(self):
         """Returns json style result"""
@@ -111,15 +107,11 @@ class Corpus(object):
     def load(cls, path, fields):
         """Load data from path to generate corpus"""
         start, sentences = 0, []
-        fields = [
-            fd if fd is not None else Field(str(i))
-            for i, fd in enumerate(fields)
-        ]
+        fields = [fd if fd is not None else Field(str(i)) for i, fd in enumerate(fields)]
         with open(path, 'r', encoding='utf-8') as f:
             lines = [
                 line.strip() for line in f.readlines()
-                if not line.startswith('#') and (
-                    len(line) == 1 or line.split()[0].isdigit())
+                if not line.startswith('#') and (len(line) == 1 or line.split()[0].isdigit())
             ]
         for i, line in enumerate(lines):
             if not line:
@@ -134,10 +126,7 @@ class Corpus(object):
     def load_lac_results(cls, inputs, fields):
         """Load data from lac results to generate corpus"""
         sentences = []
-        fields = [
-            fd if fd is not None else Field(str(i))
-            for i, fd in enumerate(fields)
-        ]
+        fields = [fd if fd is not None else Field(str(i)) for i, fd in enumerate(fields)]
         for _input in inputs:
             if isinstance(_input[0], list):
                 tokens, poss = _input
@@ -159,10 +148,7 @@ class Corpus(object):
     @classmethod
     def load_word_segments(cls, inputs, fields):
         """Load data from word segmentation results to generate corpus"""
-        fields = [
-            fd if fd is not None else Field(str(i))
-            for i, fd in enumerate(fields)
-        ]
+        fields = [fd if fd is not None else Field(str(i)) for i, fd in enumerate(fields)]
         sentences = []
         for tokens in inputs:
             values = (

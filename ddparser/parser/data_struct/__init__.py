@@ -34,7 +34,6 @@ from .embedding import Embedding
 from .metric import Metric
 
 __all__ = [
-    'batchify', 'utils', 'BucketsSampler', 'Embedding', 'Field', 'Metric',
-    'SequentialSampler', 'SubwordField', 'TextDataLoader', 'TextDataset',
-    'Vocab'
+    'batchify', 'utils', 'BucketsSampler', 'Embedding', 'Field', 'Metric', 'SequentialSampler', 'SubwordField',
+    'TextDataLoader', 'TextDataset', 'Vocab'
 ]

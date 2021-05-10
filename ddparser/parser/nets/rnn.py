@@ -86,17 +86,14 @@ class BasicLSTMUnit(dygraph.Layer):
         self._bias_attr = bias_attr
         self._gate_activation = gate_activation or layers.sigmoid
         self._activation = activation or layers.tanh
-        self._forget_bias = layers.fill_constant([1],
-                                                 dtype=dtype,
-                                                 value=forget_bias)
+        self._forget_bias = layers.fill_constant([1], dtype=dtype, value=forget_bias)
         self._forget_bias.stop_gradient = False
         self._dtype = dtype
         self._input_size = input_size
 
-        self._weight = self.create_parameter(
-            attr=self._param_attr,
-            shape=[self._input_size + self._hiden_size, 4 * self._hiden_size],
-            dtype=self._dtype)
+        self._weight = self.create_parameter(attr=self._param_attr,
+                                             shape=[self._input_size + self._hiden_size, 4 * self._hiden_size],
+                                             dtype=self._dtype)
 
         self._bias = self.create_parameter(attr=self._bias_attr,
                                            shape=[4 * self._hiden_size],
@@ -111,9 +108,7 @@ class BasicLSTMUnit(dygraph.Layer):
         gate_input = layers.elementwise_add(gate_input, self._bias)
         i, j, f, o = layers.split(gate_input, num_or_sections=4, dim=-1)
         new_cell = layers.elementwise_add(
-            layers.elementwise_mul(
-                pre_cell,
-                layers.sigmoid(layers.elementwise_add(f, self._forget_bias))),
+            layers.elementwise_mul(pre_cell, layers.sigmoid(layers.elementwise_add(f, self._forget_bias))),
             layers.elementwise_mul(layers.sigmoid(i), layers.tanh(j)))
         new_hidden = layers.tanh(new_cell) * layers.sigmoid(o)
 

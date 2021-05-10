@@ -53,15 +53,7 @@ class RawField(object):
 
 class Field(RawField):
     """Field"""
-    def __init__(self,
-                 name,
-                 pad=None,
-                 unk=None,
-                 bos=None,
-                 lower=False,
-                 use_vocab=True,
-                 tokenize=None,
-                 fn=None):
+    def __init__(self, name, pad=None, unk=None, bos=None, lower=False, use_vocab=True, tokenize=None, fn=None):
         self.name = name
         self.pad = pad
         self.unk = unk
@@ -71,9 +63,7 @@ class Field(RawField):
         self.tokenize = tokenize
         self.fn = fn
 
-        self.specials = [
-            token for token in [pad, unk, bos] if token is not None
-        ]
+        self.specials = [token for token in [pad, unk, bos] if token is not None]
 
     def __repr__(self):
         """repr"""
@@ -134,8 +124,7 @@ class Field(RawField):
         if hasattr(self, 'vocab'):
             return
         sequences = getattr(corpus, self.name)
-        counter = Counter(token for seq in sequences
-                          for token in self.preprocess(seq))
+        counter = Counter(token for seq in sequences for token in self.preprocess(seq))
         self.vocab = Vocab(counter, min_freq, self.specials, self.unk_index)
 
         if not embed:
@@ -148,8 +137,7 @@ class Field(RawField):
                 tokens[embed.unk_index] = self.unk
 
             self.vocab.extend(tokens)
-            self.embed = np.zeros((len(self.vocab), embed.dim),
-                                  dtype=np.float32)
+            self.embed = np.zeros((len(self.vocab), embed.dim), dtype=np.float32)
             self.embed[self.vocab[tokens]] = embed.vectors
             self.embed /= np.std(self.embed, ddof=1)
 
@@ -176,8 +164,7 @@ class SubwordField(Field):
         if hasattr(self, 'vocab'):
             return
         sequences = getattr(corpus, self.name)
-        counter = Counter(piece for seq in sequences for token in seq
-                          for piece in self.preprocess(token))
+        counter = Counter(piece for seq in sequences for token in seq for piece in self.preprocess(token))
         self.vocab = Vocab(counter, min_freq, self.specials, self.unk_index)
 
         if not embed:
@@ -196,21 +183,16 @@ class SubwordField(Field):
 
     def transform(self, sequences):
         """Sequences transform function, such as converting word to id, adding bos tags to sequences, etc."""
-        sequences = [[self.preprocess(token) for token in seq]
-                     for seq in sequences]
+        sequences = [[self.preprocess(token) for token in seq] for seq in sequences]
         if self.fix_len <= 0:
-            self.fix_len = max(
-                len(token) for seq in sequences for token in seq)
+            self.fix_len = max(len(token) for seq in sequences for token in seq)
         if self.use_vocab:
-            sequences = [[[self.vocab[i] for i in token] for token in seq]
-                         for seq in sequences]
+            sequences = [[[self.vocab[i] for i in token] for token in seq] for seq in sequences]
         if self.bos:
             sequences = [[[self.bos_index]] + seq for seq in sequences]
 
         sequences = [
-            nn.pad_sequence(
-                [np.array(ids[:self.fix_len], dtype=np.int64)
-                 for ids in seq], self.pad_index, self.fix_len)
+            nn.pad_sequence([np.array(ids[:self.fix_len], dtype=np.int64) for ids in seq], self.pad_index, self.fix_len)
             for seq in sequences
         ]
 

@@ -28,13 +28,7 @@ from ddparser.parser.nets import Transformer
 
 class CharTransformer(dygraph.Layer):
     """CharTransformer"""
-    def __init__(self,
-                 n_chars,
-                 n_out,
-                 pad_index,
-                 nums_heads=12,
-                 num_layers=2,
-                 name="char_transformer"):
+    def __init__(self, n_chars, n_out, pad_index, nums_heads=12, num_layers=2, name="char_transformer"):
         super(CharTransformer, self).__init__()
         self.n_chars = n_chars
         self.n_out = n_out
@@ -52,6 +46,5 @@ class CharTransformer(dygraph.Layer):
         lens = nn.reduce_sum(mask, -1)
         masked_x = nn.masked_select(x, mask)
         h, _ = self.transformer(masked_x)
-        feat_embed = nn.pad_sequence_paddle(
-            layers.split(h, lens.numpy().tolist(), dim=0), self.pad_index)
+        feat_embed = nn.pad_sequence_paddle(layers.split(h, lens.numpy().tolist(), dim=0), self.pad_index)
         return feat_embed

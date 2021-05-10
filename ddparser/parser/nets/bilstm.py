@@ -47,19 +47,16 @@ class BiLSTM(dygraph.Layer):
         self.b_cells = dygraph.LayerList()
         for _ in range(self.num_layers):
             self.f_cells.append(
-                rnn.BasicLSTMUnit(
-                    input_size=input_size,
-                    hidden_size=hidden_size,
-                    param_attr=initializer.Xavier(uniform=False),
-                    bias_attr=initializer.ConstantInitializer(value=0.0)))
+                rnn.BasicLSTMUnit(input_size=input_size,
+                                  hidden_size=hidden_size,
+                                  param_attr=initializer.Xavier(uniform=False),
+                                  bias_attr=initializer.ConstantInitializer(value=0.0)))
             self.b_cells.append(
-                rnn.BasicLSTMUnit(
-                    input_size=input_size,
-                    hidden_size=hidden_size,
-                    param_attr=initializer.Xavier(uniform=False),
-                    bias_attr=initializer.ConstantInitializer(value=0.0)))
+                rnn.BasicLSTMUnit(input_size=input_size,
+                                  hidden_size=hidden_size,
+                                  param_attr=initializer.Xavier(uniform=False),
+                                  bias_attr=initializer.ConstantInitializer(value=0.0)))
             input_size = hidden_size * 2
-
 
     def permute_hidden(self, hx, index=None):
         """permute hx by index
@@ -132,8 +129,7 @@ class BiLSTM(dygraph.Layer):
         max_bs = batch_sizes[0]
         step_embs = []
         for step, cur_bs in enumerate(batch_sizes):
-            pad_emb = layers.zeros(shape=(max_bs - cur_bs, h_size),
-                                   dtype=x.dtype)
+            pad_emb = layers.zeros(shape=(max_bs - cur_bs, h_size), dtype=x.dtype)
             step_emb = layers.concat(input=(split_x[step], pad_emb))
             step_embs.append(step_emb)
         new_x = layers.stack(step_embs, axis=1)
@@ -151,10 +147,7 @@ class BiLSTM(dygraph.Layer):
         for t in steps:
             last_bs, bs = len(hx_i[0]), batch_sizes[t]
             if last_bs < bs:
-                hx_i = [
-                    layers.concat((h, ih[last_bs:bs]))
-                    for h, ih in zip(hx_i, hx_0)
-                ]
+                hx_i = [layers.concat((h, ih[last_bs:bs])) for h, ih in zip(hx_i, hx_0)]
             else:
                 if bs < hx_i[0].shape[0]:
                     hx_n.append([hx_i[0][bs:], hx_i[1][bs:]])
@@ -175,16 +168,13 @@ class BiLSTM(dygraph.Layer):
 
     def forward(self, x, seq_mask, pad_index, hx=None):
         """Forward network"""
-        x, batch_sizes, sorted_indices = self.pack_padded_sequence(
-            x, seq_mask, pad_index)
+        x, batch_sizes, sorted_indices = self.pack_padded_sequence(x, seq_mask, pad_index)
         _, unsorted_indices = layers.argsort(sorted_indices)
         batch_size = batch_sizes[0]
         h_n, c_n = [], []
 
         if hx is None:
-            ih = layers.zeros(shape=(self.num_layers * 2, batch_size,
-                                     self.hidden_size),
-                              dtype=x[0].dtype)
+            ih = layers.zeros(shape=(self.num_layers * 2, batch_size, self.hidden_size), dtype=x[0].dtype)
             h, c = ih, ih
         else:
             h, c = self.permute_hidden(hx, sorted_indices)

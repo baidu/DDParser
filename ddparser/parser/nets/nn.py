@@ -47,11 +47,8 @@ def pad_sequence_paddle(sequences, padding_value=0):
     out_tensor = []
     for tensor in sequences:
         length = tensor.shape[0]
-        pad_tensor = layers.concat((tensor,
-                                    layers.fill_constant(
-                                        (max_len - length, *trailing_dims),
-                                        dtype=tensor.dtype,
-                                        value=padding_value)))
+        pad_tensor = layers.concat(
+            (tensor, layers.fill_constant((max_len - length, *trailing_dims), dtype=tensor.dtype, value=padding_value)))
         out_tensor.append(pad_tensor)
     out_tensor = layers.stack(out_tensor)
     return out_tensor
@@ -70,15 +67,13 @@ def fill_diagonal(x, value, offset=0, dim1=0, dim2=1):
     dim_sum = dim1 + dim2
     dim3 = 3 - dim_sum
     if offset >= 0:
-        diagonal = np.lib.stride_tricks.as_strided(
-            x[:, offset:] if dim_sum == 1 else x[:, :, offset:],
-            shape=(shape[dim3], shape[dim1] - offset),
-            strides=(strides[dim3], strides[dim1] + strides[dim2]))
+        diagonal = np.lib.stride_tricks.as_strided(x[:, offset:] if dim_sum == 1 else x[:, :, offset:],
+                                                   shape=(shape[dim3], shape[dim1] - offset),
+                                                   strides=(strides[dim3], strides[dim1] + strides[dim2]))
     else:
-        diagonal = np.lib.stride_tricks.as_strided(
-            x[-offset:, :] if dim_sum in [1, 2] else x[:, -offset:],
-            shape=(shape[dim3], shape[dim1] + offset),
-            strides=(strides[dim3], strides[dim1] + strides[dim2]))
+        diagonal = np.lib.stride_tricks.as_strided(x[-offset:, :] if dim_sum in [1, 2] else x[:, -offset:],
+                                                   shape=(shape[dim3], shape[dim1] + offset),
+                                                   strides=(strides[dim3], strides[dim1] + strides[dim2]))
 
     diagonal[...] = value
     return x
@@ -231,8 +226,7 @@ def mask_fill(input, mask, value):
         [4, 0, 0]
     ]
     """
-    return input * layers.cast(layers.logical_not(
-        mask), input.dtype) + layers.cast(mask, input.dtype) * value
+    return input * layers.cast(layers.logical_not(mask), input.dtype) + layers.cast(mask, input.dtype) * value
 
 
 def unsqueeze(input, axes):

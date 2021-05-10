@@ -29,6 +29,6 @@ from .config import ArgConfig
 from .config import Environment
 
 __all__ = [
-    'decode', 'epoch_evaluate', 'epoch_predict', 'epoch_train', 'load',
-    'loss_function', 'save', 'Model', 'ArgConfig', 'Environment'
+    'decode', 'epoch_evaluate', 'epoch_predict', 'epoch_train', 'load', 'loss_function', 'save', 'Model', 'ArgConfig',
+    'Environment'
 ]

@@ -41,8 +41,7 @@ class Metric(object):
     def __call__(self, arc_preds, rel_preds, arc_golds, rel_golds, mask):
         """call"""
         arc_mask = nn.masked_select(arc_preds == arc_golds, mask)
-        rel_mask = layers.logical_and(
-            nn.masked_select(rel_preds == rel_golds, mask), arc_mask)
+        rel_mask = layers.logical_and(nn.masked_select(rel_preds == rel_golds, mask), arc_mask)
         self.total += len(arc_mask)
         self.correct_arcs += np.sum(arc_mask.numpy()).item()
         self.correct_rels += np.sum(rel_mask.numpy()).item()
