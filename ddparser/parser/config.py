@@ -54,36 +54,22 @@ class ArgConfig(configparser.ConfigParser):
     def __init__(self, args=None):
         super(ArgConfig, self).__init__()
 
-        parser = argparse.ArgumentParser(
-            description="BaiDu's Denpendency Parser.")
-        model_g = ArgumentGroup(parser, "model",
-                                "model configuration and paths.")
+        parser = argparse.ArgumentParser(description="BaiDu's Denpendency Parser.")
+        model_g = ArgumentGroup(parser, "model", "model configuration and paths.")
         model_g.add_arg('--mode',
                         default='train',
                         choices=['train', 'evaluate', 'predict', 'predict_q'],
                         help='Select task mode')
-        model_g.add_arg('--config_path',
-                        '-c',
-                        default='config.ini',
-                        help='path to config file')
-        model_g.add_arg('--model_files',
-                        default='model_files/baidu',
-                        help='Directory path to save model and ')
+        model_g.add_arg('--config_path', '-c', default='config.ini', help='path to config file')
+        model_g.add_arg('--model_files', default='model_files/baidu', help='Directory path to save model and ')
 
-        data_g = ArgumentGroup(
-            parser, "data",
-            "Data paths, vocab paths and data processing options")
+        data_g = ArgumentGroup(parser, "data", "Data paths, vocab paths and data processing options")
         data_g.add_arg('--train_data_path', help='path to training data.')
         data_g.add_arg('--valid_data_path', help='path to valid data.')
         data_g.add_arg('--test_data_path', help='path to testing data.')
         data_g.add_arg('--infer_data_path', help='path to dataset')
-        data_g.add_arg('--pretrained_embedding_dir',
-                       "--pre_emb",
-                       help='path to pretrained embeddings')
-        data_g.add_arg('--batch_size',
-                       default=1000,
-                       type=int,
-                       help='batch size')
+        data_g.add_arg('--pretrained_embedding_dir', "--pre_emb", help='path to pretrained embeddings')
+        data_g.add_arg('--batch_size', default=1000, type=int, help='batch size')
 
         log_g = ArgumentGroup(parser, "logging", "logging related")
         log_g.add_arg('--log_path', default='./log/log', help='log path')
@@ -91,61 +77,28 @@ class ArgConfig(configparser.ConfigParser):
                       default='INFO',
                       choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'FATAL'],
                       help='log level')
-        log_g.add_arg('--infer_result_path',
-                      default='infer_result',
-                      help="Directory path to infer result.")
+        log_g.add_arg('--infer_result_path', default='infer_result', help="Directory path to infer result.")
 
         run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
-        run_type_g.add_arg('--use_cuda',
-                           '-gpu',
+        run_type_g.add_arg('--use_cuda', '-gpu', action='store_true', help='If set, use GPU for training.')
+        run_type_g.add_arg('--preprocess', '-p', action='store_true', help='whether to preprocess the data first')
+        run_type_g.add_arg('--use_data_parallel',
                            action='store_true',
-                           help='If set, use GPU for training.')
-        run_type_g.add_arg('--preprocess',
-                           '-p',
-                           action='store_true',
-                           help='whether to preprocess the data first')
-        run_type_g.add_arg(
-            '--use_data_parallel',
-            action='store_true',
-            help=
-            'The flag indicating whether to use data parallel mode to train the model.'
-        )
-        run_type_g.add_arg('--seed',
-                           '-s',
-                           default=1,
-                           type=int,
-                           help='seed for generating random numbers')
-        run_type_g.add_arg('--threads',
-                           '-t',
-                           default=16,
-                           type=int,
-                           help='max num of threads')
-        run_type_g.add_arg('--tree',
-                           action='store_true',
-                           help='whether to ensure well-formedness')
-        run_type_g.add_arg('--prob',
-                           action='store_true',
-                           help='whether to output probs')
+                           help='The flag indicating whether to use data parallel mode to train the model.')
+        run_type_g.add_arg('--seed', '-s', default=1, type=int, help='seed for generating random numbers')
+        run_type_g.add_arg('--threads', '-t', default=16, type=int, help='max num of threads')
+        run_type_g.add_arg('--tree', action='store_true', help='whether to ensure well-formedness')
+        run_type_g.add_arg('--prob', action='store_true', help='whether to output probs')
 
         train_g = ArgumentGroup(parser, "training", "training options.")
-        train_g.add_arg('--feat',
-                        default='char',
-                        choices=['pos', 'char'],
-                        help='choices of additional features')
+        train_g.add_arg('--feat', default='char', choices=['pos', 'char'], help='choices of additional features')
         train_g.add_arg('--encoding_model',
                         default='lstm',
                         choices=['lstm', 'transformer'],
                         help='choices of encode model')
-        train_g.add_arg('--buckets',
-                        default=15,
-                        type=int,
-                        help='max num of buckets to use')
-        train_g.add_arg('--punct',
-                        action='store_true',
-                        help='whether to include punctuation')
-        train_g.add_arg('--unk',
-                        default='unk',
-                        help='unk token in pretrained embeddings')
+        train_g.add_arg('--buckets', default=15, type=int, help='max num of buckets to use')
+        train_g.add_arg('--punct', action='store_true', help='whether to include punctuation')
+        train_g.add_arg('--unk', default='unk', help='unk token in pretrained embeddings')
 
         custom_g = ArgumentGroup(parser, "customize", "customized options.")
         self.build_conf(parser, args)
@@ -156,9 +109,7 @@ class ArgConfig(configparser.ConfigParser):
         self.read(args.config_path)
         self.namespace = argparse.Namespace()
         self.update(
-            dict((name, ast.literal_eval(value))
-                 for section in self.sections()
-                 for name, value in self.items(section)))
+            dict((name, ast.literal_eval(value)) for section in self.sections() for name, value in self.items(section)))
         args.nranks = fluid.dygraph.ParallelEnv().nranks
         args.local_rank = fluid.dygraph.ParallelEnv().local_rank
         args.fields_path = os.path.join(args.model_files, 'fields')
@@ -207,16 +158,14 @@ class Environment(object):
         self.args = args
         # init log
         if self.args.log_path:
-            utils.init_log(self.args.log_path, self.args.local_rank,
-                           self.args.log_level)
+            utils.init_log(self.args.log_path, self.args.local_rank, self.args.log_level)
         # init seed
         fluid.default_main_program().random_seed = self.args.seed
         np.random.seed(self.args.seed)
         # init place
         if self.args.use_cuda:
             if self.args.use_data_parallel:
-                self.place = fluid.CUDAPlace(
-                    fluid.dygraph.parallel.Env().dev_id)
+                self.place = fluid.CUDAPlace(fluid.dygraph.parallel.Env().dev_id)
             else:
                 self.place = fluid.CUDAPlace(0)
         else:
@@ -227,11 +176,7 @@ class Environment(object):
 
         if not os.path.exists(self.args.fields_path) or self.args.preprocess:
             logging.info("Preprocess the data")
-            self.WORD = Field('word',
-                              pad=utils.pad,
-                              unk=utils.unk,
-                              bos=utils.bos,
-                              lower=True)
+            self.WORD = Field('word', pad=utils.pad, unk=utils.unk, bos=utils.bos, lower=True)
             if self.args.feat == 'char':
                 self.FEAT = SubwordField('chars',
                                          pad=utils.pad,
@@ -241,26 +186,17 @@ class Environment(object):
                                          tokenize=list)
             else:
                 self.FEAT = Field('postag', bos=utils.bos)
-            self.ARC = Field('head',
-                             bos=utils.bos,
-                             use_vocab=False,
-                             fn=utils.numericalize)
+            self.ARC = Field('head', bos=utils.bos, use_vocab=False, fn=utils.numericalize)
             self.REL = Field('deprel', bos=utils.bos)
             if self.args.feat == 'char':
-                self.fields = CoNLL(FORM=(self.WORD, self.FEAT),
-                                    HEAD=self.ARC,
-                                    DEPREL=self.REL)
+                self.fields = CoNLL(FORM=(self.WORD, self.FEAT), HEAD=self.ARC, DEPREL=self.REL)
             else:
-                self.fields = CoNLL(FORM=self.WORD,
-                                    CPOS=self.FEAT,
-                                    HEAD=self.ARC,
-                                    DEPREL=self.REL)
+                self.fields = CoNLL(FORM=self.WORD, CPOS=self.FEAT, HEAD=self.ARC, DEPREL=self.REL)
 
             train = Corpus.load(self.args.train_data_path, self.fields)
             if self.args.pretrained_embedding_dir:
                 logging.info("loading pretrained embedding from file.")
-                embed = Embedding.load(self.args.pretrained_embedding_dir,
-                                       self.args.unk)
+                embed = Embedding.load(self.args.pretrained_embedding_dir, self.args.unk)
             else:
                 embed = None
             self.WORD.build(train, self.args.min_freq, embed)
@@ -280,9 +216,7 @@ class Environment(object):
             else:
                 self.WORD, self.FEAT = self.fields.FORM, self.fields.CPOS
             self.ARC, self.REL = self.fields.HEAD, self.fields.DEPREL
-        self.puncts = np.array(
-            [i for s, i in self.WORD.vocab.stoi.items() if utils.ispunct(s)],
-            dtype=np.int64)
+        self.puncts = np.array([i for s, i in self.WORD.vocab.stoi.items() if utils.ispunct(s)], dtype=np.int64)
 
         if self.WORD.embed is not None:
             self.args["pretrained_embed_shape"] = self.WORD.embed.shape

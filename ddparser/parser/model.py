@@ -55,21 +55,16 @@ class Model(dygraph.Layer):
 
         if args.pretrained_embed_shape is not None:
             if pretrained_embed is not None:
-                pre_param_attrs = fluid.ParamAttr(
-                    name="pretrained_emb",
-                    initializer=initializer.NumpyArrayInitializer(
-                        pretrained_embed),
-                    trainable=True)
-                self.pretrained = dygraph.Embedding(
-                    size=args.pretrained_embed_shape,
-                    param_attr=pre_param_attrs)
-                self.word_embed.weight = layers.create_parameter(
-                    shape=(self.args.n_words, self.args.n_embed),
-                    dtype='float32',
-                    default_initializer=initializer.Constant(value=0.0))
+                pre_param_attrs = fluid.ParamAttr(name="pretrained_emb",
+                                                  initializer=initializer.NumpyArrayInitializer(pretrained_embed),
+                                                  trainable=True)
+                self.pretrained = dygraph.Embedding(size=args.pretrained_embed_shape, param_attr=pre_param_attrs)
+                self.word_embed.weight = layers.create_parameter(shape=(self.args.n_words, self.args.n_embed),
+                                                                 dtype='float32',
+                                                                 default_initializer=initializer.Constant(value=0.0))
             else:
-                self.pretrained = dygraph.Embedding(
-                    size=args.pretrained_embed_shape)
+                pre_param_attrs = fluid.ParamAttr(name="pretrained_emb", trainable=True)
+                self.pretrained = dygraph.Embedding(size=args.pretrained_embed_shape, param_attr=pre_param_attrs)
         # Initialize feat feature, feat can be char or pos
         if args.feat == 'char':
             if args.encoding_model == "lstm":
@@ -77,58 +72,44 @@ class Model(dygraph.Layer):
                                            n_embed=args.n_char_embed,
                                            n_out=args.n_lstm_feat_embed,
                                            pad_index=args.feat_pad_index)
+                feat_embed_size = args.n_lstm_feat_embed
             else:
-                self.feat_embed = CharTransformer(
-                    n_chars=args.n_feats,
-                    n_out=args.n_tran_feat_embed,
-                    pad_index=args.feat_pad_index,
-                    nums_heads=args.n_tran_feat_head,
-                    num_layers=args.n_tran_feat_layer)
+                self.feat_embed = CharTransformer(n_chars=args.n_feats,
+                                                  n_out=args.n_tran_feat_embed,
+                                                  pad_index=args.feat_pad_index,
+                                                  nums_heads=args.n_tran_feat_head,
+                                                  num_layers=args.n_tran_feat_layer)
+                feat_embed_size = args.n_tran_feat_embed
 
         else:
-            self.feat_embed = dygraph.Embedding(size=(args.n_feats,
-                                                      args.n_feat_embed))
+            self.feat_embed = dygraph.Embedding(size=(args.n_feats, args.n_feat_embed))
+            feat_embed_size = args.n_feat_embed
         self.embed_dropout = IndependentDropout(p=args.embed_dropout)
         if args.encoding_model == "lstm":
             # lstm layer
-            self.lstm = BiLSTM(input_size=args.n_embed +
-                               args.n_lstm_feat_embed,
+            self.lstm = BiLSTM(input_size=args.n_embed + feat_embed_size,
                                hidden_size=args.n_lstm_hidden,
                                num_layers=args.n_lstm_layers,
                                dropout=args.lstm_dropout)
             self.lstm_dropout = SharedDropout(p=args.lstm_dropout)
             mlp_input_size = args.n_lstm_hidden * 2
         else:
-            self.transformer = Transformer(hidden_size=args.n_embed +
-                                           args.n_tran_feat_embed,
+            self.transformer = Transformer(hidden_size=args.n_embed + feat_embed_size,
                                            vocab_size=args.n_words,
                                            name="word_transformer",
                                            num_heads=args.n_tran_word_head,
                                            num_layers=args.n_tran_word_layer)
-            mlp_input_size = args.n_embed + args.n_tran_feat_embed
+            mlp_input_size = args.n_embed + feat_embed_size
 
         # mlp layer
-        self.mlp_arc_h = MLP(n_in=mlp_input_size,
-                             n_out=args.n_mlp_arc,
-                             dropout=args.mlp_dropout)
-        self.mlp_arc_d = MLP(n_in=mlp_input_size,
-                             n_out=args.n_mlp_arc,
-                             dropout=args.mlp_dropout)
-        self.mlp_rel_h = MLP(n_in=mlp_input_size,
-                             n_out=args.n_mlp_rel,
-                             dropout=args.mlp_dropout)
-        self.mlp_rel_d = MLP(n_in=mlp_input_size,
-                             n_out=args.n_mlp_rel,
-                             dropout=args.mlp_dropout)
+        self.mlp_arc_h = MLP(n_in=mlp_input_size, n_out=args.n_mlp_arc, dropout=args.mlp_dropout)
+        self.mlp_arc_d = MLP(n_in=mlp_input_size, n_out=args.n_mlp_arc, dropout=args.mlp_dropout)
+        self.mlp_rel_h = MLP(n_in=mlp_input_size, n_out=args.n_mlp_rel, dropout=args.mlp_dropout)
+        self.mlp_rel_d = MLP(n_in=mlp_input_size, n_out=args.n_mlp_rel, dropout=args.mlp_dropout)
 
         # biaffine layers
-        self.arc_attn = Biaffine(n_in=args.n_mlp_arc,
-                                 bias_x=True,
-                                 bias_y=False)
-        self.rel_attn = Biaffine(n_in=args.n_mlp_rel,
-                                 n_out=args.n_rels,
-                                 bias_x=True,
-                                 bias_y=True)
+        self.arc_attn = Biaffine(n_in=args.n_mlp_arc, bias_x=True, bias_y=False)
+        self.rel_attn = Biaffine(n_in=args.n_mlp_rel, n_out=args.n_rels, bias_x=True, bias_y=True)
         self.pad_index = args.pad_index
         self.unk_index = args.unk_index
 
@@ -169,8 +150,7 @@ class Model(dygraph.Layer):
         # [batch_size, seq_len, seq_len]
         s_arc = self.arc_attn(arc_d, arc_h)
         # [batch_size, seq_len, seq_len, n_rels]
-        s_rel = layers.transpose(self.rel_attn(rel_d, rel_h),
-                                 perm=(0, 2, 3, 1))
+        s_rel = layers.transpose(self.rel_attn(rel_d, rel_h), perm=(0, 2, 3, 1))
         # set the scores that exceed the length of each sentence to -1e5
         s_arc_mask = nn.unsqueeze(layers.logical_not(mask), 1)
         s_arc = nn.mask_fill(s_arc, s_arc_mask, -1e5)
@@ -184,9 +164,7 @@ def epoch_train(args, model, optimizer, loader, epoch):
     for batch, (words, feats, arcs, rels) in enumerate(loader(), start=1):
         model.clear_gradients()
         # ignore the first token of each sentence
-        tmp_words = layers.pad(words[:, 1:],
-                               paddings=[0, 0, 1, 0],
-                               pad_value=args.pad_index)
+        tmp_words = layers.pad(words[:, 1:], paddings=[0, 0, 1, 0], pad_value=args.pad_index)
         mask = tmp_words != args.pad_index
         s_arc, s_rel = model(words, feats)
         loss = loss_function(s_arc, s_rel, arcs, rels, mask)
@@ -215,9 +193,7 @@ def epoch_evaluate(args, model, loader, puncts):
 
     for words, feats, arcs, rels in loader():
         # ignore the first token of each sentence
-        tmp_words = layers.pad(words[:, 1:],
-                               paddings=[0, 0, 1, 0],
-                               pad_value=args.pad_index)
+        tmp_words = layers.pad(words[:, 1:], paddings=[0, 0, 1, 0], pad_value=args.pad_index)
         mask = tmp_words != args.pad_index
 
         s_arc, s_rel = model(words, feats)
@@ -227,9 +203,8 @@ def epoch_evaluate(args, model, loader, puncts):
         if not args.punct:
             punct_mask = layers.reduce_all(
                 layers.expand(layers.unsqueeze(words, -1),
-                              (1, 1, puncts.shape[0])) != layers.expand(
-                                  layers.reshape(puncts, (1, 1, -1)),
-                                  (*words.shape, 1)),
+                              (1, 1, puncts.shape[0])) != layers.expand(layers.reshape(puncts, (1, 1, -1)),
+                                                                        (*words.shape, 1)),
                 dim=-1)
             mask = layers.logical_and(mask, punct_mask)
 
@@ -247,27 +222,18 @@ def epoch_predict(env, args, model, loader):
     arcs, rels, probs = [], [], []
     for words, feats in loader():
         # ignore the first token of each sentence
-        tmp_words = layers.pad(words[:, 1:],
-                               paddings=[0, 0, 1, 0],
-                               pad_value=args.pad_index)
+        tmp_words = layers.pad(words[:, 1:], paddings=[0, 0, 1, 0], pad_value=args.pad_index)
         mask = tmp_words != args.pad_index
         lens = nn.reduce_sum(mask, -1)
         s_arc, s_rel = model(words, feats)
         arc_preds, rel_preds = decode(args, s_arc, s_rel, mask)
-        arcs.extend(
-            layers.split(nn.masked_select(arc_preds, mask),
-                         lens.numpy().tolist()))
-        rels.extend(
-            layers.split(nn.masked_select(rel_preds, mask),
-                         lens.numpy().tolist()))
+        arcs.extend(layers.split(nn.masked_select(arc_preds, mask), lens.numpy().tolist()))
+        rels.extend(layers.split(nn.masked_select(rel_preds, mask), lens.numpy().tolist()))
         if args.prob:
-            arc_probs = nn.index_sample(layers.softmax(s_arc, -1),
-                                        layers.unsqueeze(arc_preds, -1))
+            arc_probs = nn.index_sample(layers.softmax(s_arc, -1), layers.unsqueeze(arc_preds, -1))
             probs.extend(
-                layers.split(
-                    nn.masked_select(layers.squeeze(arc_probs, axes=[-1]),
-                                     mask),
-                    lens.numpy().tolist()))
+                layers.split(nn.masked_select(layers.squeeze(arc_probs, axes=[-1]), mask),
+                             lens.numpy().tolist()))
     arcs = [seq.numpy().tolist() for seq in arcs]
     rels = [env.REL.vocab[seq.numpy().tolist()] for seq in rels]
     probs = [[round(p, 3) for p in seq.numpy().tolist()] for seq in probs]
