@@ -18,7 +18,7 @@
 """本文件自定义的网络工具函数"""
 
 import numpy as np
-
+import paddle
 from paddle.fluid import layers
 from paddle.fluid.core_avx import VarDesc
 
@@ -48,7 +48,7 @@ def pad_sequence_paddle(sequences, padding_value=0):
     for tensor in sequences:
         length = tensor.shape[0]
         pad_tensor = layers.concat(
-            (tensor, layers.fill_constant((max_len - length, *trailing_dims), dtype=tensor.dtype, value=padding_value)))
+            (tensor, layers.fill_constant([max_len - length] + trailing_dims, dtype=tensor.dtype, value=padding_value)))
         out_tensor.append(pad_tensor)
     out_tensor = layers.stack(out_tensor)
     return out_tensor
@@ -125,8 +125,8 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
     m = strides[0] + strides[1]
     k = strides[1] if dim == 1 else strides[0]
     return np.lib.stride_tricks.as_strided(x[offset[0]:, offset[1]:],
-                                           shape=(n, w, *x.shape[2:]),
-                                           strides=(m, k, *strides[2:]))
+                                           shape=[n, w] + list(x.shape[2:]),
+                                           strides=[m, k] + list(strides[2:]))
 
 
 def masked_select(input, mask):
@@ -184,10 +184,10 @@ def index_sample(x, index):
     x_s = x.shape
     dim = len(index.shape) - 1
     assert x_s[:dim] == index.shape[:dim]
-    r_x = layers.reshape(x, shape=(-1, *x_s[dim:]))
+    r_x = layers.reshape(x, shape=[-1] + x_s[dim:])
     index = layers.reshape(index, shape=(len(r_x), -1, 1))
     # generate arange index, shape like index
-    arr_index = layers.arange(start=0, end=len(index), dtype=index.dtype)
+    arr_index = paddle.arange(start=0, end=len(index), dtype=index.dtype)
     arr_index = layers.unsqueeze(arr_index, axes=[1, 2])
     arr_index = layers.expand_as(arr_index, index)
     #  genrate new index
@@ -195,8 +195,56 @@ def index_sample(x, index):
     new_index = layers.reshape(new_index, (-1, 2))
     # get output
     out = layers.gather_nd(r_x, new_index)
-    out = layers.reshape(out, (*x_s[:dim], -1))
+    out = layers.reshape(out, x_s[:dim] + [-1])
     return out
+
+
+# def index_sample_v2(x, index):
+#     """Select input value according to index
+
+#     Arags：
+#         input: input matrix
+#         index: index matrix
+#     Returns:
+#         output
+#     >>> input
+#     [
+#         [1, 2, 3],
+#         [4, 5, 6]
+#     ]
+#     >>> index
+#     [
+#         [1, 2],
+#         [0, 1]
+#     ]
+#     >>> index_sample(input, index)
+#     [
+#         [2, 3],
+#         [4, 5]
+#     ]
+#     """
+#     x_s = x.shape
+#     i_s = index.shape
+#     dim = len(index.shape)
+#     assert x_s[0] == index.shape[0] and len(index.shape) == 2
+#     if len(x_s) == len(i_s):
+#         return paddle.index_sample(x, index)
+#     elif len(x_s) > len(i_s):
+#         diff_dim = list(range(2, 2 + len(x_s) - len(i_s)))
+#         new_index = index.unsqueeze(axis=diff_dim)
+#         # x.shape == new_index.shape
+#         new_index = new_index.expand(shape=[*i_s, *x_s[dim:]])
+#         x = paddle.transpose(x, perm=[0, *diff_dim, 1])
+#         new_index = paddle.transpose(new_index, perm=[0, *diff_dim, 1])
+#         trans_shape = new_index.shape
+#         x = paddle.reshape(x, shape=(-1, x_s[1]))
+#         new_index = paddle.reshape(new_index, shape=(-1, i_s[1]))
+#         new_x = paddle.index_sample(x, new_index)
+#         new_x = new_x.reshape(shape=trans_shape)
+#         new_x = paddle.transpose(new_x, perm=[0, len(x_s) - 1, *list(range(1, len(x_s) - 1))])
+#         return new_x
+#     else:
+#         raise IndexError('index_sample error!')
 
 
 def mask_fill(input, mask, value):
@@ -226,7 +274,7 @@ def mask_fill(input, mask, value):
         [4, 0, 0]
     ]
     """
-    return input * layers.cast(layers.logical_not(mask), input.dtype) + layers.cast(mask, input.dtype) * value
+    return input * layers.logical_not(mask) + layers.cast(mask, input.dtype) * value
 
 
 def unsqueeze(input, axes):

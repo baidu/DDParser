@@ -2,7 +2,7 @@
 # MODEL PATH
 MODEL_FILES_PATH="./model_files"
 # MODEL_NAME
-MODEL_FILES_NAME=DDParser-char-lstm-0.1.2.tar.gz
+MODEL_FILES_NAME=DDParser-ernie-lstm-0.1.3.tar.gz
 
 #get pretrained_char_model
 wget --no-check-certificate https://ddparser.bj.bcebos.com/$MODEL_FILES_NAME

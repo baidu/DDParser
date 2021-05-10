@@ -23,7 +23,6 @@ import ast
 import argparse
 import configparser
 import logging
-
 import os
 import math
 import pickle
@@ -32,10 +31,12 @@ import numpy as np
 from paddle import fluid
 from paddle.fluid import dygraph
 
+from ddparser.ernie.tokenizing_ernie import ErnieTokenizer
 from ddparser.parser.data_struct import utils
 from ddparser.parser.data_struct import CoNLL
 from ddparser.parser.data_struct import Corpus
 from ddparser.parser.data_struct import Embedding
+from ddparser.parser.data_struct import ErnieField
 from ddparser.parser.data_struct import Field
 from ddparser.parser.data_struct import SubwordField
 
@@ -56,49 +57,84 @@ class ArgConfig(configparser.ConfigParser):
 
         parser = argparse.ArgumentParser(description="BaiDu's Denpendency Parser.")
         model_g = ArgumentGroup(parser, "model", "model configuration and paths.")
-        model_g.add_arg('--mode',
-                        default='train',
-                        choices=['train', 'evaluate', 'predict', 'predict_q'],
-                        help='Select task mode')
-        model_g.add_arg('--config_path', '-c', default='config.ini', help='path to config file')
-        model_g.add_arg('--model_files', default='model_files/baidu', help='Directory path to save model and ')
+        model_g.add_arg(
+            "--mode",
+            default="train",
+            choices=["train", "evaluate", "predict", "predict_q"],
+            help="Select task mode",
+        )
+        model_g.add_arg("--config_path", "-c", default="config.ini", help="path to config file")
+        model_g.add_arg(
+            "--model_files",
+            default="model_files/baidu",
+            help="Directory path to save model and ",
+        )
 
         data_g = ArgumentGroup(parser, "data", "Data paths, vocab paths and data processing options")
-        data_g.add_arg('--train_data_path', help='path to training data.')
-        data_g.add_arg('--valid_data_path', help='path to valid data.')
-        data_g.add_arg('--test_data_path', help='path to testing data.')
-        data_g.add_arg('--infer_data_path', help='path to dataset')
-        data_g.add_arg('--pretrained_embedding_dir', "--pre_emb", help='path to pretrained embeddings')
-        data_g.add_arg('--batch_size', default=1000, type=int, help='batch size')
+        data_g.add_arg("--train_data_path", help="path to training data.")
+        data_g.add_arg("--valid_data_path", help="path to valid data.")
+        data_g.add_arg("--test_data_path", help="path to testing data.")
+        data_g.add_arg("--infer_data_path", help="path to dataset")
+        data_g.add_arg("--batch_size", default=1000, type=int, help="batch size")
 
         log_g = ArgumentGroup(parser, "logging", "logging related")
-        log_g.add_arg('--log_path', default='./log/log', help='log path')
-        log_g.add_arg('--log_level',
-                      default='INFO',
-                      choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'FATAL'],
-                      help='log level')
-        log_g.add_arg('--infer_result_path', default='infer_result', help="Directory path to infer result.")
+        log_g.add_arg("--log_path", default="./log/log", help="log path")
+        log_g.add_arg(
+            "--log_level",
+            default="INFO",
+            choices=["DEBUG", "INFO", "WARNING", "ERROR", "FATAL"],
+            help="log level",
+        )
+        log_g.add_arg(
+            "--infer_result_path",
+            default="infer_result",
+            help="Directory path to infer result.",
+        )
 
         run_type_g = ArgumentGroup(parser, "run_type", "running type options.")
-        run_type_g.add_arg('--use_cuda', '-gpu', action='store_true', help='If set, use GPU for training.')
-        run_type_g.add_arg('--preprocess', '-p', action='store_true', help='whether to preprocess the data first')
-        run_type_g.add_arg('--use_data_parallel',
-                           action='store_true',
-                           help='The flag indicating whether to use data parallel mode to train the model.')
-        run_type_g.add_arg('--seed', '-s', default=1, type=int, help='seed for generating random numbers')
-        run_type_g.add_arg('--threads', '-t', default=16, type=int, help='max num of threads')
-        run_type_g.add_arg('--tree', action='store_true', help='whether to ensure well-formedness')
-        run_type_g.add_arg('--prob', action='store_true', help='whether to output probs')
+        run_type_g.add_arg(
+            "--use_cuda",
+            "-gpu",
+            action="store_true",
+            help="If set, use GPU for training.",
+        )
+        run_type_g.add_arg(
+            "--preprocess",
+            "-p",
+            action="store_true",
+            help="whether to preprocess the data first",
+        )
+        run_type_g.add_arg(
+            "--use_data_parallel",
+            action="store_true",
+            help="The flag indicating whether to use data parallel mode to train the model.",
+        )
+        run_type_g.add_arg(
+            "--seed",
+            "-s",
+            default=1,
+            type=int,
+            help="seed for generating random numbers",
+        )
+        run_type_g.add_arg("--threads", "-t", default=16, type=int, help="max num of threads")
+        run_type_g.add_arg("--tree", action="store_true", help="whether to ensure well-formedness")
+        run_type_g.add_arg("--prob", action="store_true", help="whether to output probs")
 
         train_g = ArgumentGroup(parser, "training", "training options.")
-        train_g.add_arg('--feat', default='char', choices=['pos', 'char'], help='choices of additional features')
-        train_g.add_arg('--encoding_model',
-                        default='lstm',
-                        choices=['lstm', 'transformer'],
-                        help='choices of encode model')
-        train_g.add_arg('--buckets', default=15, type=int, help='max num of buckets to use')
-        train_g.add_arg('--punct', action='store_true', help='whether to include punctuation')
-        train_g.add_arg('--unk', default='unk', help='unk token in pretrained embeddings')
+        train_g.add_arg(
+            "--feat",
+            default="none",
+            choices=["pos", "char", "none"],
+            help="choices of additional features",
+        )
+        train_g.add_arg(
+            "--encoding_model",
+            default="ernie-lstm",
+            choices=["lstm", "transformer", "ernie-1.0", "ernie-tiny", "ernie-lstm"],
+            help="choices of encode model",
+        )
+        train_g.add_arg("--buckets", default=15, type=int, help="max num of buckets to use")
+        train_g.add_arg("--punct", action="store_true", help="whether to include punctuation")
 
         custom_g = ArgumentGroup(parser, "customize", "customized options.")
         self.build_conf(parser, args)
@@ -112,8 +148,8 @@ class ArgConfig(configparser.ConfigParser):
             dict((name, ast.literal_eval(value)) for section in self.sections() for name, value in self.items(section)))
         args.nranks = fluid.dygraph.ParallelEnv().nranks
         args.local_rank = fluid.dygraph.ParallelEnv().local_rank
-        args.fields_path = os.path.join(args.model_files, 'fields')
-        args.model_path = os.path.join(args.model_files, 'model')
+        args.fields_path = os.path.join(args.model_files, "fields")
+        args.model_path = os.path.join(args.model_files, "model")
         # update config from args
         self.update(vars(args))
         return self
@@ -121,9 +157,9 @@ class ArgConfig(configparser.ConfigParser):
     def __repr__(self):
         """repr"""
         s = line = "-" * 25 + "-+-" + "-" * 25 + "\n"
-        s += f"{'Param':25} | {'Value':^25}\n" + line
+        s += "{:25} | {:^25}\n".format('Param', 'Value') + line
         for name, value in vars(self.namespace).items():
-            s += f"{name:25} | {str(value):^25}\n"
+            s += "{:25} | {:^25}\n".format(name, str(value))
         s += line
 
         return s
@@ -157,58 +193,87 @@ class Environment(object):
     def __init__(self, args):
         self.args = args
         # init log
-        if self.args.log_path:
-            utils.init_log(self.args.log_path, self.args.local_rank, self.args.log_level)
+        if args.log_path:
+            utils.init_log(args.log_path, args.local_rank, args.log_level)
         # init seed
-        fluid.default_main_program().random_seed = self.args.seed
-        np.random.seed(self.args.seed)
+        fluid.default_main_program().random_seed = args.seed
+        np.random.seed(args.seed)
         # init place
-        if self.args.use_cuda:
-            if self.args.use_data_parallel:
-                self.place = fluid.CUDAPlace(fluid.dygraph.parallel.Env().dev_id)
-            else:
-                self.place = fluid.CUDAPlace(0)
+        if args.use_cuda:
+            self.place = "gpu"
+
         else:
-            self.place = fluid.CPUPlace()
+            self.place = "cpu"
 
-        os.environ['FLAGS_paddle_num_threads'] = str(self.args.threads)
-        os.makedirs(self.args.model_files, exist_ok=True)
-
-        if not os.path.exists(self.args.fields_path) or self.args.preprocess:
+        os.environ["FLAGS_paddle_num_threads"] = str(args.threads)
+        if not os.path.exists(self.args.model_files):
+            os.makedirs(self.args.model_files)
+        if not os.path.exists(args.fields_path) or args.preprocess:
             logging.info("Preprocess the data")
-            self.WORD = Field('word', pad=utils.pad, unk=utils.unk, bos=utils.bos, lower=True)
-            if self.args.feat == 'char':
-                self.FEAT = SubwordField('chars',
-                                         pad=utils.pad,
-                                         unk=utils.unk,
-                                         bos=utils.bos,
-                                         fix_len=self.args.fix_len,
-                                         tokenize=list)
+            if args.encoding_model in ["ernie-1.0", "ernie-tiny", "ernie-lstm"]:
+                tokenizer = ErnieTokenizer.from_pretrained(args.encoding_model)
+                args["ernie_vocabs_size"] = len(tokenizer.vocab)
+                self.WORD = ErnieField(
+                    "word",
+                    pad=tokenizer.pad_token,
+                    unk=tokenizer.unk_token,
+                    bos=tokenizer.cls_token,
+                    eos=tokenizer.sep_token,
+                    fix_len=args.fix_len,
+                    tokenizer=tokenizer,
+                )
+                self.WORD.vocab = tokenizer.vocab
+                args.feat = None
             else:
-                self.FEAT = Field('postag', bos=utils.bos)
-            self.ARC = Field('head', bos=utils.bos, use_vocab=False, fn=utils.numericalize)
-            self.REL = Field('deprel', bos=utils.bos)
-            if self.args.feat == 'char':
+                self.WORD = Field(
+                    "word",
+                    pad=utils.pad,
+                    unk=utils.unk,
+                    bos=utils.bos,
+                    eos=utils.eos,
+                    lower=True,
+                )
+            if args.feat == "char":
+                self.FEAT = SubwordField(
+                    "chars",
+                    pad=utils.pad,
+                    unk=utils.unk,
+                    bos=utils.bos,
+                    eos=utils.eos,
+                    fix_len=args.fix_len,
+                    tokenize=list,
+                )
+            elif args.feat == "pos":
+                self.FEAT = Field("postag", bos=utils.bos, eos=utils.eos)
+            else:
+                self.FEAT = None
+            self.ARC = Field(
+                "head",
+                bos=utils.bos,
+                eos=utils.eos,
+                use_vocab=False,
+                fn=utils.numericalize,
+            )
+            self.REL = Field("deprel", bos=utils.bos, eos=utils.eos)
+            if args.feat == "char":
                 self.fields = CoNLL(FORM=(self.WORD, self.FEAT), HEAD=self.ARC, DEPREL=self.REL)
             else:
                 self.fields = CoNLL(FORM=self.WORD, CPOS=self.FEAT, HEAD=self.ARC, DEPREL=self.REL)
 
-            train = Corpus.load(self.args.train_data_path, self.fields)
-            if self.args.pretrained_embedding_dir:
-                logging.info("loading pretrained embedding from file.")
-                embed = Embedding.load(self.args.pretrained_embedding_dir, self.args.unk)
-            else:
-                embed = None
-            self.WORD.build(train, self.args.min_freq, embed)
-            self.FEAT.build(train)
+            train = Corpus.load(args.train_data_path, self.fields)
+
+            if not args.encoding_model.startswith("ernie"):
+                self.WORD.build(train, args.min_freq)
+                self.FEAT.build(train)
+
             self.REL.build(train)
-            if self.args.local_rank == 0:
-                with open(self.args.fields_path, "wb") as f:
+            if args.local_rank == 0:
+                with open(args.fields_path, "wb") as f:
                     logging.info("dumping fileds to disk.")
                     pickle.dump(self.fields, f, protocol=2)
         else:
             logging.info("loading the fields.")
-            with open(self.args.fields_path, "rb") as f:
+            with open(args.fields_path, "rb") as f:
                 self.fields = pickle.load(f)
 
             if isinstance(self.fields.FORM, tuple):
@@ -216,19 +281,21 @@ class Environment(object):
             else:
                 self.WORD, self.FEAT = self.fields.FORM, self.fields.CPOS
             self.ARC, self.REL = self.fields.HEAD, self.fields.DEPREL
-        self.puncts = np.array([i for s, i in self.WORD.vocab.stoi.items() if utils.ispunct(s)], dtype=np.int64)
 
-        if self.WORD.embed is not None:
-            self.args["pretrained_embed_shape"] = self.WORD.embed.shape
+        if args.encoding_model.startswith("ernie"):
+            vocab_items = self.WORD.vocab.items()
         else:
-            self.args["pretrained_embed_shape"] = None
+            vocab_items = self.WORD.vocab.stoi.items()
+
+        self.puncts = np.array([i for s, i in vocab_items if utils.ispunct(s)], dtype=np.int64)
 
         self.args.update({
-            'n_words': self.WORD.vocab.n_init,
-            'n_feats': len(self.FEAT.vocab),
-            'n_rels': len(self.REL.vocab),
-            'pad_index': self.WORD.pad_index,
-            'unk_index': self.WORD.unk_index,
-            'bos_index': self.WORD.bos_index,
-            'feat_pad_index': self.FEAT.pad_index
+            "n_words": len(self.WORD.vocab),
+            "n_feats": self.FEAT and len(self.FEAT.vocab),
+            "n_rels": len(self.REL.vocab),
+            "pad_index": self.WORD.pad_index,
+            "unk_index": self.WORD.unk_index,
+            "bos_index": self.WORD.bos_index,
+            "eos_index": self.WORD.eos_index,
+            "feat_pad_index": self.FEAT and self.FEAT.pad_index,
         })

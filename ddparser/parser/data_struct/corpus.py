@@ -20,7 +20,11 @@
 """
 
 from collections import namedtuple
-from collections.abc import Iterable
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
+    from io import open
 
 from ddparser.parser.data_struct import Field
 
@@ -133,15 +137,11 @@ class Corpus(object):
             else:
                 tokens = _input
                 poss = ['-'] * len(tokens)
-            values = (
+            values = [
                 list(range(1,
-                           len(tokens) + 1)),
-                tokens,
-                tokens,
-                poss,
-                poss,
-                *[['-'] * len(tokens) for _ in range(5)],
-            )
+                           len(tokens) + 1)), tokens, tokens, poss, poss
+            ] + [['-'] * len(tokens) for _ in range(5)]
+
             sentences.append(Sentence(fields, values))
         return cls(fields, sentences)
 
@@ -151,22 +151,19 @@ class Corpus(object):
         fields = [fd if fd is not None else Field(str(i)) for i, fd in enumerate(fields)]
         sentences = []
         for tokens in inputs:
-            values = (
-                list(range(1,
-                           len(tokens) + 1)),
-                tokens,
-                tokens,
-                *[['-'] * len(tokens) for _ in range(7)],
-            )
+            values = [list(range(1,
+                                 len(tokens) + 1)), tokens, tokens
+                      ] + [['-'] * len(tokens) for _ in range(7)]
+
             sentences.append(Sentence(fields, values))
         return cls(fields, sentences)
 
     def save(self, path):
         """Dumping corpus to disk"""
         with open(path, 'w') as f:
-            f.write(f"{self}\n")
+            f.write("{}\n".format(self))
 
-    def print(self):
+    def _print(self):
         """Print self"""
         print(self)
 

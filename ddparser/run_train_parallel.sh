@@ -12,13 +12,12 @@ python -u -m paddle.distributed.launch  --selected_gpus=$GPUS run.py \
                 --mode=train \
                 --use_cuda \
                 --use_data_parallel \
-                --feat=char \
+                --feat=none \
                 --model_files=model_files/baidu \
-                --encoding_model=lstm \
+                --encoding_model=ernie-lstm \
                 --preprocess \
                 --train_data_path=data/baidu/train.txt \
                 --valid_data_path=data/baidu/dev.txt \
                 --test_data_path=data/baidu/test.txt \
-                --unk=UNK \
                 --buckets=15 \
                 --batch_size=1000

@@ -21,7 +21,7 @@ Setup script.
 Authors: zhangshuai28(zhangshuai28@baidu.com)
 Date:    2020/06/22 11:48:37
 """
-
+from io import open
 import pkg_resources
 import setuptools
 from setuptools import setup
@@ -32,30 +32,30 @@ install_requires = []
 try:
     import paddle
     # 若版本太低，设置版本的更新
-    if paddle.__version__ < '1.8.2' or paddle.__version__ > '2.0':
+    if paddle.__version__ < '2.0':
         installed_packages = pkg_resources.working_set
         paddle_pkgs = [i.key for i in installed_packages if "paddle" in i.key]
 
         if "paddlepaddle-gpu" in paddle_pkgs:
-            install_requires = ['paddlepaddle-gpu>=1.8.2, <2.0']
+            install_requires = ['paddlepaddle-gpu>=2.0']
         elif "paddlepaddle" in paddle_pkgs:
-            install_requires = ['paddlepaddle>=1.8.2, <2.0']
+            install_requires = ['paddlepaddle>=2.0']
 
 except ImportError:
-    install_requires = ['paddlepaddle>=1.8.2, <2.0']
+    install_requires = ['paddlepaddle>=2.0']
 try:
     import LAC
     # 若版本太低，设置版本的更新
-    if LAC.version < '0.1.4':
-        install_requires.append('LAC>=0.1.4')
+    if LAC.version < '2.1':
+        install_requires.append('LAC>=2.1')
 except ImportError:
-    install_requires.append('LAC>=0.1.4')
+    install_requires.append('LAC>=2.1')
 
 with open("README.md", "r", encoding='utf8') as fh:
     long_description = fh.read()
 setup(
     name="ddparser",
-    version="0.1.2",
+    version="0.1.3",
     author="Baidu NLP",
     author_email="nlp-parser@baidu.com",
     description="A chinese dependency parser tool by Baidu NLP.",
@@ -63,7 +63,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/baidu/ddparser",
     install_requires=install_requires,
-    python_requires=">=3.6",
+    python_requires=">=2.7",
     packages=setuptools.find_packages(),
     include_package_data=True,
     platforms="any",
@@ -72,7 +72,9 @@ setup(
     classifiers=[
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python',
+        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
 )

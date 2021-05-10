@@ -38,7 +38,7 @@ class RawField(object):
 
     def __repr__(self):
         """repr"""
-        return f"({self.name}): {self.__class__.__name__}()"
+        return "({}): {}()".format(self.name, self.__class__.__name__)
 
     def preprocess(self, sequence):
         """preprocess"""
@@ -53,31 +53,45 @@ class RawField(object):
 
 class Field(RawField):
     """Field"""
-    def __init__(self, name, pad=None, unk=None, bos=None, lower=False, use_vocab=True, tokenize=None, fn=None):
+    def __init__(self,
+                 name,
+                 pad=None,
+                 unk=None,
+                 bos=None,
+                 eos=None,
+                 lower=False,
+                 use_vocab=True,
+                 tokenize=None,
+                 tokenizer=None,
+                 fn=None):
         self.name = name
         self.pad = pad
         self.unk = unk
         self.bos = bos
+        self.eos = eos
         self.lower = lower
         self.use_vocab = use_vocab
         self.tokenize = tokenize
+        self.tokenizer = tokenizer
         self.fn = fn
 
-        self.specials = [token for token in [pad, unk, bos] if token is not None]
+        self.specials = [token for token in [pad, unk, bos, eos] if token is not None]
 
     def __repr__(self):
         """repr"""
-        s, params = f"({self.name}): {self.__class__.__name__}(", []
+        s, params = "({}): {}(".format(self.name, self.__class__.__name__), []
         if self.pad is not None:
-            params.append(f"pad={self.pad}")
+            params.append("pad={}".format(self.pad))
         if self.unk is not None:
-            params.append(f"unk={self.unk}")
+            params.append("unk={}".format(self.unk))
         if self.bos is not None:
-            params.append(f"bos={self.bos}")
+            params.append("bos={}".format(self.bos))
+        if self.eos is not None:
+            params.append("eos={}".format(self.eos))
         if self.lower:
-            params.append(f"lower={self.lower}")
+            params.append("lower={}".format(self.lower))
         if not self.use_vocab:
-            params.append(f"use_vocab={self.use_vocab}")
+            params.append("use_vocab={}".format(self.use_vocab))
         s += ", ".join(params)
         s += ")"
 
@@ -104,9 +118,20 @@ class Field(RawField):
     @property
     def bos_index(self):
         """bos index"""
+        if self.bos is None:
+            return 0
         if hasattr(self, 'vocab'):
             return self.vocab[self.bos]
         return self.specials.index(self.bos)
+
+    @property
+    def eos_index(self):
+        """eos index"""
+        if self.eos is None:
+            return 0
+        if hasattr(self, 'vocab'):
+            return self.vocab[self.eos]
+        return self.specials.index(self.eos)
 
     def preprocess(self, sequence):
         """preprocess"""
@@ -114,32 +139,20 @@ class Field(RawField):
             sequence = self.fn(sequence)
         if self.tokenize is not None:
             sequence = self.tokenize(sequence)
+        elif self.tokenizer is not None:
+            sequence = self.tokenizer.tokenize(sequence)
         if self.lower:
-            sequence = [str.lower(token) for token in sequence]
+            sequence = [token.lower() for token in sequence]
 
         return sequence
 
-    def build(self, corpus, min_freq=1, embed=None):
-        """Create vocab and embed based on corpus"""
+    def build(self, corpus, min_freq=1):
+        """Create vocab based on corpus"""
         if hasattr(self, 'vocab'):
             return
         sequences = getattr(corpus, self.name)
         counter = Counter(token for seq in sequences for token in self.preprocess(seq))
         self.vocab = Vocab(counter, min_freq, self.specials, self.unk_index)
-
-        if not embed:
-            self.embed = None
-        else:
-            tokens = self.preprocess(embed.tokens)
-            # if the `unk` token has existed in the pretrained,
-            # then replace it with a self-defined one
-            if embed.unk:
-                tokens[embed.unk_index] = self.unk
-
-            self.vocab.extend(tokens)
-            self.embed = np.zeros((len(self.vocab), embed.dim), dtype=np.float32)
-            self.embed[self.vocab[tokens]] = embed.vectors
-            self.embed /= np.std(self.embed, ddof=1)
 
     def transform(self, sequences):
         """Sequences transform function, such as converting word to id, adding bos tags to sequences, etc."""
@@ -148,6 +161,9 @@ class Field(RawField):
             sequences = [self.vocab[seq] for seq in sequences]
         if self.bos:
             sequences = [[self.bos_index] + seq for seq in sequences]
+        if self.eos:
+            sequences = [seq + [self.eos_index] for seq in sequences]
+
         sequences = [np.array(seq, dtype=np.int64) for seq in sequences]
 
         return sequences
@@ -159,27 +175,13 @@ class SubwordField(Field):
         self.fix_len = kwargs.pop('fix_len') if 'fix_len' in kwargs else 0
         super(SubwordField, self).__init__(*args, **kwargs)
 
-    def build(self, corpus, min_freq=1, embed=None):
-        """Create vocab and embed based on corpus"""
+    def build(self, corpus, min_freq=1):
+        """Create vocab based on corpus"""
         if hasattr(self, 'vocab'):
             return
         sequences = getattr(corpus, self.name)
         counter = Counter(piece for seq in sequences for token in seq for piece in self.preprocess(token))
         self.vocab = Vocab(counter, min_freq, self.specials, self.unk_index)
-
-        if not embed:
-            self.embed = None
-        else:
-            tokens = self.preprocess(embed.tokens)
-            # if the `unk` token has existed in the pretrained,
-            # then replace it with a self-defined one
-            if embed.unk:
-                tokens[embed.unk_index] = self.unk
-
-            self.vocab.extend(tokens)
-
-            self.embed = np.zeros(len(self.vocab), embed.dim)
-            self.embed[self.vocab[tokens]] = embed.vectors
 
     def transform(self, sequences):
         """Sequences transform function, such as converting word to id, adding bos tags to sequences, etc."""
@@ -190,7 +192,33 @@ class SubwordField(Field):
             sequences = [[[self.vocab[i] for i in token] for token in seq] for seq in sequences]
         if self.bos:
             sequences = [[[self.bos_index]] + seq for seq in sequences]
+        if self.eos:
+            sequences = [seq + [[self.eos_index]] for seq in sequences]
+        sequences = [
+            nn.pad_sequence([np.array(ids[:self.fix_len], dtype=np.int64) for ids in seq], self.pad_index, self.fix_len)
+            for seq in sequences
+        ]
 
+        return sequences
+
+
+class ErnieField(Field):
+    """SubwordField"""
+    def __init__(self, *args, **kwargs):
+        self.fix_len = kwargs.pop('fix_len') if 'fix_len' in kwargs else 0
+        super(ErnieField, self).__init__(*args, **kwargs)
+
+    def transform(self, sequences):
+        """Sequences transform function, such as converting word to id, adding bos tags to sequences, etc."""
+        sequences = [[self.preprocess(token) for token in seq] for seq in sequences]
+        if self.fix_len <= 0:
+            self.fix_len = max(len(token) for seq in sequences for token in seq)
+        if self.use_vocab:
+            sequences = [[[self.vocab[i] for i in token] for token in seq] for seq in sequences]
+        if self.bos:
+            sequences = [[[self.bos_index]] + seq for seq in sequences]
+        if self.eos:
+            sequences = [seq + [[self.eos_index]] for seq in sequences]
         sequences = [
             nn.pad_sequence([np.array(ids[:self.fix_len], dtype=np.int64) for ids in seq], self.pad_index, self.fix_len)
             for seq in sequences

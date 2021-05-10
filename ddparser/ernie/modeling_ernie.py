@@ -1,3 +1,4 @@
+# -*- coding: UTF-8 -*-
 #   Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -204,6 +205,7 @@ class PretrainedModel(object):
     bce = 'https://ernie-github.cdn.bcebos.com/'
     resource_map = {
         'ernie-1.0': bce + 'model-ernie1.0.1.tar.gz',
+        'ernie-lstm': bce + 'model-ernie1.0.1.tar.gz',
         'ernie-2.0-en': bce + 'model-ernie2.0-en.1.tar.gz',
         'ernie-2.0-large-en': bce + 'model-ernie2.0-large-en.1.tar.gz',
         'ernie-tiny': bce + 'model-ernie_tiny.1.tar.gz',
@@ -243,6 +245,9 @@ class PretrainedModel(object):
                 if k not in m:
                     log.warn('param:%s not set in pretrained model, skip' % k)
                     m[k] = v  # FIXME: no need to do this in the future
+            for k in list(m.keys()):
+                if k not in model.state_dict().keys():
+                    del m[k]
             model.set_dict(m)
         else:
             raise ValueError('weight file not found in pretrain dir: %s' % pretrain_dir)
@@ -256,6 +261,7 @@ class ErnieModel(D.Layer, PretrainedModel):
         """
         log.debug('init ErnieModel with config: %s' % repr(cfg))
         D.Layer.__init__(self)
+        self.cfg = cfg
         d_model = cfg['hidden_size']
         d_emb = cfg.get('emb_size', cfg['hidden_size'])
         d_vocab = cfg['vocab_size']
@@ -395,6 +401,24 @@ class ErnieModel(D.Layer, PretrainedModel):
             return pooled, encoded, additional_info
         else:
             return pooled, encoded
+
+
+class ErnieEmbedding(D.Layer, PretrainedModel):
+    def __init__(self, cfg, name=None):
+        """
+        Fundamental pretrained Ernie model
+        """
+        log.debug('init ErnieModel with config: %s' % repr(cfg))
+        D.Layer.__init__(self)
+        self.cfg = cfg
+        d_emb = cfg.get('emb_size', cfg['hidden_size'])
+        d_vocab = cfg['vocab_size']
+
+        initializer = F.initializer.TruncatedNormal(scale=cfg['initializer_range'])
+
+        self.word_emb = D.Embedding([d_vocab, d_emb],
+                                    param_attr=F.ParamAttr(name=append_name(name, 'word_embedding'),
+                                                           initializer=initializer))
 
 
 class ErnieModelForSequenceClassification(ErnieModel):

@@ -18,6 +18,10 @@
 """
 本文件定义了使用到的工具类和函数
 """
+from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import division
 
 import copy
 import logging
@@ -25,10 +29,8 @@ import logging.handlers
 import os
 import requests
 import shutil
-import ssl
 import tarfile
 import unicodedata
-from urllib.request import urlopen
 
 import numpy as np
 from tqdm import tqdm
@@ -38,10 +40,10 @@ from ddparser.parser.nets import nn
 pad = '<pad>'
 unk = '<unk>'
 bos = '<bos>'
+eos = '<eos>'
 
 DOWNLOAD_MODEL_PATH_DICT = {
-    'lstm': "https://ddparser.bj.bcebos.com/DDParser-char-lstm-0.1.2.tar.gz",
-    "transformer": "https://ddparser.bj.bcebos.com/DDParser-char-transformer-0.1.2.tar.gz"
+    'ernie-lstm': "https://ddparser.bj.bcebos.com/DDParser-ernie-lstm-0.1.3.tar.gz",
 }
 
 
@@ -201,10 +203,10 @@ class DepTree:
         for node in self.nodes[1:]:
             self.add(self.nodes[node.parent], node)
 
-    def add(self, parent: NODE, child: NODE):
+    def add(self, parent, child):
         """Add a child node"""
         if parent.id is None or child.id is None:
-            raise f"id is None"
+            raise Exception("id is None")
         if parent.id < child.id:
             parent.rights = sorted(parent.rights + [child.id])
         else:
@@ -298,23 +300,22 @@ def download_model_from_url(path, model='lstm'):
     if os.path.exists(temp_path):
         shutil.rmtree(temp_path)
     os.mkdir(temp_path)
-    # downloding the model.
-    context = ssl._create_unverified_context()
-    file_size = int(urlopen(download_model_path, context=context).info().get('Content-Length', -1))
-    pbar = tqdm(total=file_size, initial=0, unit='B', unit_scale=True, desc="loading ddparser model:")
-    req = requests.get(download_model_path, stream=True, verify=False)
+
     with (open(file_path, 'ab')) as f:
-        for chunk in req.iter_content(chunk_size=1024):
+        r = requests.get(download_model_path, stream=True)
+        total_len = int(r.headers.get('content-length'))
+        for chunk in tqdm(r.iter_content(chunk_size=1024),
+                          total=total_len // 1024,
+                          desc='downloading %s' % download_model_path,
+                          unit='KB'):
             if chunk:
                 f.write(chunk)
-                pbar.update(1024)
-    pbar.close()
-    # extracting the model from tar.
-    tar = tarfile.open(file_path)
-    names = tar.getnames()
-    for name in names:
-        tar.extract(name, path=temp_path)
-    tar.close()
+                f.flush()
+
+    logging.debug('extacting... to %s' % file_path)
+    with tarfile.open(file_path) as tf:
+        tf.extractall(path=temp_path)
+
     # mv temp_path path
     for _, dirs, _ in os.walk(temp_path):
         if len(dirs) != 1:

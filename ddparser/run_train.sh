@@ -8,12 +8,11 @@ set -x
 python -u run.py \
         --mode=train \
         --use_cuda \
-        --feat=char \
+        --feat=none \
         --preprocess \
         --model_files=model_files/baidu \
         --train_data_path=data/baidu/train.txt \
         --valid_data_path=data/baidu/dev.txt \
         --test_data_path=data/baidu/test.txt \
-        --encoding_model=lstm \
-        --unk=UNK \
+        --encoding_model=ernie-lstm \
         --buckets=15 

@@ -9,7 +9,7 @@ set -x
 python  run.py \
         --mode=predict_q \
         --use_cuda \
-        --encoding_model=lstm \
+        --encoding_model=ernie-lstm \
         --model_files=model_files/baidu \
         --buckets=15 \
         --tree

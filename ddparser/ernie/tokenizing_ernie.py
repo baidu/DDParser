@@ -77,6 +77,7 @@ class ErnieTokenizer(object):
     bce = 'https://ernie-github.cdn.bcebos.com/'
     resource_map = {
         'ernie-1.0': bce + 'model-ernie1.0.1.tar.gz',
+        'ernie-lstm': bce + 'model-ernie1.0.1.tar.gz',
         'ernie-2.0-en': bce + 'model-ernie2.0-en.1.tar.gz',
         'ernie-2.0-large-en': bce + 'model-ernie2.0-large-en.1.tar.gz',
         'ernie-tiny': bce + 'model-ernie_tiny.1.tar.gz',
@@ -123,6 +124,7 @@ class ErnieTokenizer(object):
         self.pad_id = self.vocab[pad_token]
         self.cls_token = cls_token
         self.pad_token = pad_token
+        self.sep_token = sep_token
         self.cls_id = cls_token and self.vocab[cls_token]
         self.sep_id = sep_token and self.vocab[sep_token]
         self.unk_id = unk_token and self.vocab[unk_token]
@@ -201,6 +203,14 @@ class ErnieTokenizer(object):
         ret_id, ret_id_type = self.build_for_ernie(text_id, pair_id)
         return ret_id, ret_id_type
 
+    def __getstate__(self):
+        """getstate"""
+        return vars(self)
+
+    def __setstate__(self, state):
+        """setstate"""
+        self.__dict__.update(state)
+
 
 class ErnieTinyTokenizer(ErnieTokenizer):
     bce = 'https://ernie-github.cdn.bcebos.com/'
@@ -251,3 +261,11 @@ class ErnieTinyTokenizer(ErnieTokenizer):
         for match in self.cut(text):
             res += self.sp_model.EncodeAsPieces(match)
         return res
+
+    def __getstate__(self):
+        """getstate"""
+        return vars(self)
+
+    def __setstate__(self, state):
+        """setstate"""
+        self.__dict__.update(state)

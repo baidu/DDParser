@@ -10,7 +10,7 @@ python  run.py \
         --mode=evaluate \
         --use_cuda \
         --model_files=model_files/baidu \
-        --encoding_model=lstm \
+        --encoding_model=ernie-lstm \
         --test_data_path=data/baidu/test.txt \
         --buckets=15 \
         --tree

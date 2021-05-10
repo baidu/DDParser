@@ -20,7 +20,10 @@
 """
 
 import math
-from collections.abc import Iterable
+try:
+    from collections.abc import Iterable
+except:
+    from collections import Iterable
 from itertools import chain
 
 import numpy as np
@@ -114,7 +117,7 @@ class BucketsSampler(object):
         self.chunks = []
         for size, bucket in zip(self.sizes, self.buckets):
             max_ch = max(math.ceil(size * len(bucket) / batch_size), 1)
-            chunk = min(len(bucket), max_ch)
+            chunk = min(len(bucket), int(max_ch))
             self.chunks.append(chunk)
 
     def __iter__(self):
@@ -150,21 +153,25 @@ class SequentialSampler(object):
                 yield batch
 
 
-def batchify(dataset,
-             batch_size,
-             use_data_parallel=False,
-             shuffle=False,
-             use_multiprocess=True,
-             sequential_sampler=False):
+def batchify(
+    dataset,
+    batch_size,
+    use_data_parallel=False,
+    shuffle=False,
+    use_multiprocess=True,
+    sequential_sampler=False,
+):
     """Returns data loader"""
     if sequential_sampler:
         batch_sampler = SequentialSampler(batch_size=batch_size, corpus_length=len(dataset))
     else:
         batch_sampler = BucketsSampler(buckets=dataset.buckets, batch_size=batch_size, shuffle=shuffle)
-    loader = TextDataLoader(dataset=dataset,
-                            batch_sampler=batch_sampler,
-                            collate_fn=dataset.collate_fn,
-                            use_data_parallel=use_data_parallel,
-                            use_multiprocess=use_multiprocess)
+    loader = TextDataLoader(
+        dataset=dataset,
+        batch_sampler=batch_sampler,
+        collate_fn=dataset.collate_fn,
+        use_data_parallel=use_data_parallel,
+        use_multiprocess=use_multiprocess,
+    )
 
     return loader

@@ -42,9 +42,9 @@ DDParser(Bai**d**u **D**ependency **Parser**)是百度自然语言处理部基�
 ## 快速开始
 
 ### 版本依赖
-* `python`: >=3.6.0, <3.8.0
-* [`paddlepaddle`](https://www.paddlepaddle.org.cn/): >=1.8.2, <2.0
-* [`LAC`](https://github.com/baidu/lac): >=0.1.4
+* `python`: 2.7,>=3.6.0
+* [`paddlepaddle`](https://www.paddlepaddle.org.cn/): >=2.0
+* [`LAC`](https://github.com/baidu/lac): >=2.1
 <br>
 
 ### 一键安装
@@ -71,8 +71,6 @@ DDParser(Bai**d**u **D**ependency **Parser**)是百度自然语言处理部基�
 [{'word': ['百度', '是', '一家', '高科技', '公司'], 'postag': ['ORG', 'v', 'm', 'n', 'n'], 'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'], 'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
 >>> # buckets=True, 数据集长度不均时处理速度更快
 >>> ddp = DDParser(buckets=True)
->>> # 选择使用transformer模型
->>> ddp = DDParser(encoding_model='transformer')
 >>> # 使用GPU
 >>> ddp = DDParser(use_cuda=True)
 ```
@@ -110,14 +108,12 @@ pip install --upgrade LAC
 CUDA_VISIBLE_DEVICES=0 python -u run.py \
         --mode=train \
         --use_cuda \
-        --feat=char \
+        --feat=none \
         --preprocess \
-        --model_files=model_files/baidu \
         --model_files=model_files/baidu \
         --train_data_path=data/baidu/train.txt \
         --valid_data_path=data/baidu/dev.txt \
         --test_data_path=data/baidu/test.txt \
-        --unk=UNK \
         --buckets=15
 ```
 <font size=3 color=gray>注：用户可通过修改`train_data_path`, `valid_data_path`和`test_data_path`指定训练集，评估集和测试集, 参数含义见[参数说明](#参数说明)，所用数据集格式见[数据格式说明](#数据格式说明)。</font>
@@ -186,11 +182,10 @@ seed：随机数种子（默认：1）
 threads：控制每个paddle实例的线程数
 tree：确保输出结果是正确的依存句法树
 prob：如果设置，则输出每个弧的概率，保存在结果的PROB列。
-feat：选择输入的特征（char，pos）
+feat：选择输入的特征（none，char，pos；ernie-*模型feat只能选择none）
 buckets：选择最大分桶数（默认：15）
 punct：评估结果的时候是否包含标点
-unk：指定在预训练词表中UNK符号
-encoding_model：选择底层模型, 默认lstm(lstm, transformer)
+encoding_model：选择底层模型, 默认ernie-lstm(lstm, transformer, ernie-1.0, ernie-tiny, ernie-lstm)
 ```
 ### 数据格式说明
 本项目数据格式基于CoNLL-X([官方说明](https://ilk.uvt.nl/~emarsi/download/pubs/14964.pdf))的风格，缺少的字段使用"-"代替（用户只用关注ID，FROM，HEAD，DEPREL，PROB等列即可），如“百度是一家高科技公司”的可解析为如下格式：

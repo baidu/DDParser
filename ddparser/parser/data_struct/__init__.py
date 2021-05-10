@@ -20,6 +20,7 @@
 from . import utils
 
 from .vocab import Vocab
+from .field import ErnieField
 from .field import Field
 from .field import SubwordField
 from .corpus import CoNLL
@@ -34,6 +35,6 @@ from .embedding import Embedding
 from .metric import Metric
 
 __all__ = [
-    'batchify', 'utils', 'BucketsSampler', 'Embedding', 'Field', 'Metric', 'SequentialSampler', 'SubwordField',
-    'TextDataLoader', 'TextDataset', 'Vocab'
+    'batchify', 'utils', 'BucketsSampler', 'Embedding', 'ErnieField', 'Field', 'Metric', 'SequentialSampler',
+    'SubwordField', 'TextDataLoader', 'TextDataset', 'Vocab'
 ]

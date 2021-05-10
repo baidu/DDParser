@@ -15,12 +15,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #################################################################################
+from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import division
+
 import sys
 import os
 import datetime
 import logging
 import math
-import pickle
+import six
+import paddle
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -30,6 +36,8 @@ from paddle import fluid
 from paddle.fluid import dygraph
 from paddle.fluid import layers
 
+from ddparser.ernie.optimization import AdamW
+from ddparser.ernie.optimization import LinearDecay
 from ddparser.parser import epoch_train
 from ddparser.parser import epoch_evaluate
 from ddparser.parser import epoch_predict
@@ -67,70 +75,92 @@ def train(env):
     dev.loader = batchify(dev, args.batch_size)
     test.loader = batchify(test, args.batch_size)
 
-    logging.info(f"{'train:':6} {len(train):5} sentences, "
-                 f"{len(train.loader):3} batches, "
-                 f"{len(train.buckets)} buckets")
-    logging.info(f"{'dev:':6} {len(dev):5} sentences, "
-                 f"{len(dev.loader):3} batches, "
-                 f"{len(train.buckets)} buckets")
-    logging.info(f"{'test:':6} {len(test):5} sentences, "
-                 f"{len(test.loader):3} batches, "
-                 f"{len(train.buckets)} buckets")
+    logging.info("{:6} {:5} sentences, ".format('train:', len(train)) + "{:3} batches, ".format(len(train.loader)) +
+                 "{} buckets".format(len(train.buckets)))
+    logging.info("{:6} {:5} sentences, ".format('dev:', len(dev)) + "{:3} batches, ".format(len(dev.loader)) +
+                 "{} buckets".format(len(dev.buckets)))
+    logging.info("{:6} {:5} sentences, ".format('test:', len(test)) + "{:3} batches, ".format(len(test.loader)) +
+                 "{} buckets".format(len(test.buckets)))
 
     logging.info("Create the model")
-    model = Model(args, env.WORD.embed)
+    model = Model(args)
 
     # init parallel strategy
     if args.use_data_parallel:
         strategy = dygraph.parallel.prepare_context()
         model = dygraph.parallel.DataParallel(model, strategy)
 
-    if args.use_cuda:
-        grad_clip = fluid.clip.GradientClipByNorm(clip_norm=args.clip)
+    if args.encoding_model.startswith(
+            "ernie") and args.encoding_model != "ernie-lstm" or args.encoding_model == 'transformer':
+        args['lr'] = args.ernie_lr
     else:
-        grad_clip = fluid.clip.GradientClipByGlobalNorm(clip_norm=args.clip)
-    decay = dygraph.ExponentialDecay(learning_rate=args.lr, decay_steps=args.decay_steps, decay_rate=args.decay)
-    optimizer = fluid.optimizer.AdamOptimizer(learning_rate=decay,
-                                              beta1=args.mu,
-                                              beta2=args.nu,
-                                              epsilon=args.epsilon,
-                                              parameter_list=model.parameters(),
-                                              grad_clip=grad_clip)
+        args['lr'] = args.lstm_lr
+
+    if args.encoding_model.startswith("ernie") and args.encoding_model != "ernie-lstm":
+        max_steps = 100 * len(train.loader)
+        decay = LinearDecay(args.lr, int(args.warmup_proportion * max_steps), max_steps)
+        clip = args.ernie_clip
+    else:
+        decay = dygraph.ExponentialDecay(learning_rate=args.lr, decay_steps=args.decay_steps, decay_rate=args.decay)
+        clip = args.clip
+
+    if args.use_cuda:
+        grad_clip = fluid.clip.GradientClipByNorm(clip_norm=clip)
+    else:
+        grad_clip = fluid.clip.GradientClipByGlobalNorm(clip_norm=clip)
+
+    if args.encoding_model.startswith("ernie") and args.encoding_model != "ernie-lstm":
+        optimizer = AdamW(
+            learning_rate=decay,
+            parameter_list=model.parameters(),
+            weight_decay=args.weight_decay,
+            grad_clip=grad_clip,
+        )
+    else:
+        optimizer = fluid.optimizer.AdamOptimizer(
+            learning_rate=decay,
+            beta1=args.mu,
+            beta2=args.nu,
+            epsilon=args.epsilon,
+            parameter_list=model.parameters(),
+            grad_clip=grad_clip,
+        )
 
     total_time = datetime.timedelta()
     best_e, best_metric = 1, Metric()
 
     puncts = dygraph.to_variable(env.puncts, zero_copy=False)
     logging.info("start training.")
+
     for epoch in range(1, args.epochs + 1):
         start = datetime.datetime.now()
         # train one epoch and update the parameter
-        logging.info(f"Epoch {epoch} / {args.epochs}:")
+        logging.info("Epoch {} / {}:".format(epoch, args.epochs))
         epoch_train(args, model, optimizer, train.loader, epoch)
         if args.local_rank == 0:
             loss, dev_metric = epoch_evaluate(args, model, dev.loader, puncts)
-            logging.info(f"{'dev:':6} Loss: {loss:.4f} {dev_metric}")
+            logging.info("{:6} Loss: {:.4f} {}".format('dev:', loss, dev_metric))
             loss, test_metric = epoch_evaluate(args, model, test.loader, puncts)
-            logging.info(f"{'test:':6} Loss: {loss:.4f} {test_metric}")
+            logging.info("{:6} Loss: {:.4f} {}".format('test:', loss, test_metric))
 
             t = datetime.datetime.now() - start
             # save the model if it is the best so far
             if dev_metric > best_metric and epoch > args.patience // 10:
                 best_e, best_metric = epoch, dev_metric
                 save(args.model_path, args, model, optimizer)
-                logging.info(f"{t}s elapsed (saved)\n")
+                logging.info("{}s elapsed (saved)\n".format(t))
             else:
-                logging.info(f"{t}s elapsed\n")
+                logging.info("{}s elapsed\n".format(t))
             total_time += t
             if epoch - best_e >= args.patience:
                 break
     if args.local_rank == 0:
         model = load(args.model_path, model)
         loss, metric = epoch_evaluate(args, model, test.loader, puncts)
-        logging.info(f"max score of dev is {best_metric.score:.2%} at epoch {best_e}")
-        logging.info(f"the score of test at epoch {best_e} is {metric.score:.2%}")
-        logging.info(f"average time of each epoch is {total_time / epoch}s")
-        logging.info(f"{total_time}s elapsed")
+        logging.info("max score of dev is {:.2%} at epoch {}".format(best_metric.score, best_e))
+        logging.info("the score of test at epoch {} is {:.2%}".format(best_e, metric.score))
+        logging.info("average time of each epoch is {}s".format(total_time / epoch))
+        logging.info("{}s elapsed".format(total_time))
 
 
 def evaluate(env):
@@ -144,7 +174,8 @@ def evaluate(env):
     # set the data loader
     dataset.loader = batchify(dataset, args.batch_size)
 
-    logging.info(f"{len(dataset)} sentences, " f"{len(dataset.loader)} batches, " f"{len(dataset.buckets)} buckets")
+    logging.info("{} sentences, ".format(len(dataset)) + "{} batches, ".format(len(dataset.loader)) +
+                 "{} buckets".format(len(dataset.buckets)))
     logging.info("Load the model")
     model = load(args.model_path)
 
@@ -152,8 +183,8 @@ def evaluate(env):
     start = datetime.datetime.now()
     loss, metric = epoch_evaluate(args, model, dataset.loader, puncts)
     total_time = datetime.datetime.now() - start
-    logging.info(f"Loss: {loss:.4f} {metric}")
-    logging.info(f"{total_time}s elapsed, " f"{len(dataset) / total_time.total_seconds():.2f} Sents/s")
+    logging.info("Loss: {:.4f} {}".format(loss, metric))
+    logging.info("{}s elapsed, {:.2f} Sents/s".format(total_time, len(dataset) / total_time.total_seconds()))
 
 
 def predict(env):
@@ -162,12 +193,12 @@ def predict(env):
 
     logging.info("Load the dataset")
     if args.prob:
-        env.fields = env.fields._replace(PHEAD=Field('prob'))
+        env.fields = env.fields._replace(PHEAD=Field("prob"))
     predicts = Corpus.load(args.infer_data_path, env.fields)
     dataset = TextDataset(predicts, [env.WORD, env.FEAT], args.buckets)
     # set the data loader
     dataset.loader = batchify(dataset, args.batch_size)
-    logging.info(f"{len(dataset)} sentences, " f"{len(dataset.loader)} batches")
+    logging.info("{} sentences, {} batches".format(len(dataset), len(dataset.loader)))
 
     logging.info("Load the model")
     model = load(args.model_path)
@@ -184,9 +215,9 @@ def predict(env):
     predicts.deprel = [pred_rels[i] for i in indices]
     if args.prob:
         predicts.prob = [pred_probs[i] for i in indices]
-    logging.info(f"Save the predicted result to {args.infer_result_path}")
+    logging.info("Save the predicted result to {}".format(args.infer_result_path))
     predicts.save(args.infer_result_path)
-    logging.info(f"{total_time}s elapsed, " f"{len(dataset) / total_time.total_seconds():.2f} Sents/s")
+    logging.info("{}s elapsed, {:.2f} Sents/s".format(total_time, len(dataset) / total_time.total_seconds()))
 
 
 def predict_query(env):
@@ -198,7 +229,7 @@ def predict_query(env):
     lac_mode = "seg" if args.feat != "pos" else "lac"
     lac = LAC.LAC(mode=lac_mode)
     if args.prob:
-        env.fields = env.fields._replace(PHEAD=Field('prob'))
+        env.fields = env.fields._replace(PHEAD=Field("prob"))
 
     while True:
         query = input()
@@ -219,12 +250,12 @@ def predict_query(env):
         predicts.deprel = pred_rels
         if args.prob:
             predicts.prob = pred_probs
-        predicts.print()
+        predicts._print()
         total_time = datetime.datetime.now() - start
-        logging.info(
-            f"{total_time}s elapsed, "
-            f"{len(dataset) / total_time.total_seconds():.2f} Sents/s, {total_time.total_seconds() / len(dataset) * 1000:.2f} ms/Sents"
-        )
+        logging.info("{}s elapsed, {:.2f} Sents/s, {:.2f} ms/Sents".format(
+            total_time,
+            len(dataset) / total_time.total_seconds(),
+            total_time.total_seconds() / len(dataset) * 1000))
 
 
 class DDParser(object):
@@ -240,33 +271,37 @@ class DDParser(object):
     buckets: BOOL, 是否对样本分桶. 若buckets=True，则会对inputs按长度分桶，处理长度不均匀的输入速度更新快，default=False
     batch_size: INT, 批尺寸, 当buckets为False时，每个batch大小均等于batch_size; 当buckets为True时，每个batch的大小约为'batch_size / 当前桶句子的平均长度'。
                 当default=None时，分桶batch_size默认等于1000，不分桶默认等于50。
+    encoding_model:指定模型，可以选lstm、transformer、ernie-1.0、ernie-tiny等
     """
-    def __init__(self,
-                 use_cuda=False,
-                 tree=True,
-                 prob=False,
-                 use_pos=False,
-                 model_files_path=None,
-                 buckets=False,
-                 batch_size=None,
-                 encoding_model='lstm'):
+    def __init__(
+        self,
+        use_cuda=False,
+        tree=True,
+        prob=False,
+        use_pos=False,
+        model_files_path=None,
+        buckets=False,
+        batch_size=None,
+        encoding_model="ernie-lstm",
+    ):
         if model_files_path is None:
-            if encoding_model == 'lstm':
-                model_files_path = self._get_abs_path('./model_files/lstm')
-            elif encoding_model == 'transformer':
-                model_files_path = self._get_abs_path('./model_files/transformer')
+            if encoding_model in ["lstm", "transformer", "ernie-1.0", "ernie-tiny", "ernie-lstm"]:
+                model_files_path = self._get_abs_path(os.path.join("./model_files/", encoding_model))
             else:
-                raise "Unknown encoding model."
+                raise KeyError("Unknown encoding model.")
 
             if not os.path.exists(model_files_path):
                 try:
                     utils.download_model_from_url(model_files_path, encoding_model)
                 except Exception as e:
                     logging.error("Failed to download model, please try again")
-                    logging.error(f"error: {e}")
+                    logging.error("error: {}".format(e))
                     raise e
 
-        args = [f"--model_files={model_files_path}", f"--config_path={self._get_abs_path('config.ini')}"]
+        args = [
+            "--model_files={}".format(model_files_path), "--config_path={}".format(self._get_abs_path('config.ini')),
+            "--encoding_model={}".format(encoding_model)
+        ]
 
         if use_cuda:
             args.append("--use_cuda")
@@ -275,7 +310,7 @@ class DDParser(object):
         if prob:
             args.append("--prob")
         if batch_size:
-            args.append(f"--batch_size={batch_size}")
+            args.append("--batch_size={}", format(batch_size))
 
         args = ArgConfig(args)
         # Don't instantiate the log handle
@@ -291,9 +326,9 @@ class DDParser(object):
         if not buckets:
             self.args.buckets = None
         if args.prob:
-            self.env.fields = self.env.fields._replace(PHEAD=Field('prob'))
+            self.env.fields = self.env.fields._replace(PHEAD=Field("prob"))
         if self.use_pos:
-            self.env.fields = self.env.fields._replace(CPOS=Field('postag'))
+            self.env.fields = self.env.fields._replace(CPOS=Field("postag"))
         # set default batch size if batch_size is None and not buckets
         if batch_size is None and not buckets:
             self.args.batch_size = 50
@@ -316,24 +351,30 @@ class DDParser(object):
 
         >>> inputs = ["百度是一家高科技公司", "他送了一本书"]
         >>> ddp.parse(inputs)
-        [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}, 
+        [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']},
          {'word': ['他', '送', '了', '一本', '书'], 'head': [2, 0, 2, 5, 2], 'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
 
         >>> ddp = DDParser(prob=True, use_pos=True)
         >>> inputs = "百度是一家高科技公司"
         >>> ddp.parse(inputs)
-        [{'word': ['百度', '是', '一家', '高科技', '公司'], 'postag': ['ORG', 'v', 'm', 'n', 'n'], 
+        [{'word': ['百度', '是', '一家', '高科技', '公司'], 'postag': ['ORG', 'v', 'm', 'n', 'n'],
         'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'], 'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
         """
         if not self.lac:
-            self.lac = LAC.LAC(mode='lac' if self.use_pos else "seg", use_cuda=self.args.use_cuda)
+            self.lac = LAC.LAC(mode="lac" if self.use_pos else "seg", use_cuda=self.args.use_cuda)
         if not inputs:
             return
-        if isinstance(inputs, str):
+        if isinstance(inputs, six.string_types):
             inputs = [inputs]
-        if all([isinstance(i, str) and i for i in inputs]):
+        if all([isinstance(i, six.string_types) and i for i in inputs]):
             lac_results = []
             position = 0
+            try:
+                inputs = [query if isinstance(query, six.text_type) else query.decode("utf-8") for query in inputs]
+            except UnicodeDecodeError:
+                logging.warning("encoding only supports UTF-8!")
+                return
+
             while position < len(inputs):
                 lac_results += self.lac.run(inputs[position:position + self.args.batch_size])
                 position += self.args.batch_size
@@ -344,10 +385,12 @@ class DDParser(object):
         dataset = TextDataset(predicts, [self.env.WORD, self.env.FEAT], self.args.buckets)
         # set the data loader
 
-        dataset.loader = batchify(dataset,
-                                  self.args.batch_size,
-                                  use_multiprocess=False,
-                                  sequential_sampler=True if not self.args.buckets else False)
+        dataset.loader = batchify(
+            dataset,
+            self.args.batch_size,
+            use_multiprocess=False,
+            sequential_sampler=True if not self.args.buckets else False,
+        )
         pred_arcs, pred_rels, pred_probs = epoch_predict(self.env, self.args, self.model, dataset.loader)
 
         if self.args.buckets:
@@ -362,7 +405,7 @@ class DDParser(object):
         outputs = predicts.get_result()
         return outputs
 
-    def parse_seg(self, inputs: list):
+    def parse_seg(self, inputs):
         """
         预测已切词的句子。
 
@@ -376,14 +419,14 @@ class DDParser(object):
         >>> ddp = DDParser()
         >>> inputs = [['百度', '是', '一家', '高科技', '公司'], ['他', '送', '了', '一本', '书']]
         >>> ddp.parse_seg(inputs)
-        [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}, 
+        [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']},
         {'word': ['他', '送', '了', '一本', '书'], 'head': [2, 0, 2, 5, 2], 'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
 
-        
+
         >>> ddp = DDParser(prob=True)
         >>> inputs = [['百度', '是', '一家', '高科技', '公司']]
         >>> ddp.parse_seg(inputs)
-        [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': [2, 0, 5, 5, 2], 
+        [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': [2, 0, 5, 5, 2],
         'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'], 'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
         """
         if not inputs:
@@ -395,10 +438,12 @@ class DDParser(object):
             return
         dataset = TextDataset(predicts, [self.env.WORD, self.env.FEAT], self.args.buckets)
         # set the data loader
-        dataset.loader = batchify(dataset,
-                                  self.args.batch_size,
-                                  use_multiprocess=False,
-                                  sequential_sampler=True if not self.args.buckets else False)
+        dataset.loader = batchify(
+            dataset,
+            self.args.batch_size,
+            use_multiprocess=False,
+            sequential_sampler=True if not self.args.buckets else False,
+        )
         pred_arcs, pred_rels, pred_probs = epoch_predict(self.env, self.args, self.model, dataset.loader)
 
         if self.args.buckets:
@@ -420,18 +465,18 @@ class DDParser(object):
         return os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), path))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logging.info("init arguments.")
     args = ArgConfig()
     logging.info("init environment.")
     env = Environment(args)
-    logging.info(f"Override the default configs\n{env.args}")
-    logging.info(f"{env.WORD}\n{env.FEAT}\n{env.ARC}\n{env.REL}")
-    logging.info(f"Set the max num of threads to {env.args.threads}")
-    logging.info(f"Set the seed for generating random numbers to {env.args.seed}")
-    logging.info(f"Run the subcommand in mode {env.args.mode}")
+    logging.info("Override the default configs\n{}".format(env.args))
+    logging.info("{}\n{}\n{}\n{}".format(env.WORD, env.FEAT, env.ARC, env.REL))
+    logging.info("Set the max num of threads to {}".format(env.args.threads))
+    logging.info("Set the seed for generating random numbers to {}".format(env.args.seed))
+    logging.info("Run the subcommand in mode {}".format(env.args.mode))
 
-    fluid.enable_imperative(env.place)
+    paddle.set_device(env.place)
     mode = env.args.mode
     if mode == "train":
         train(env)
@@ -442,4 +487,4 @@ if __name__ == '__main__':
     elif mode == "predict_q":
         predict_query(env)
     else:
-        logging.error(f"Unknown task mode: {mode}.")
+        logging.error("Unknown task mode: {}.".format(mode))
