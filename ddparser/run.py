@@ -27,9 +27,14 @@ import logging
 import math
 import six
 import paddle
+from six.moves import input
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+try:
+    reload(sys)
+    sys.setdefaultencoding('utf8')
+except:
+    pass
 import LAC
 import numpy as np
 from paddle import fluid
@@ -233,6 +238,10 @@ def predict_query(env):
 
     while True:
         query = input()
+        if isinstance(query, six.text_type):
+            pass
+        else:
+            query = query.decode("utf-8")
         if not query:
             logging.info("quit!")
             return
