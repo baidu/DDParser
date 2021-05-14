@@ -259,7 +259,7 @@ def load(path, model=None, mode="evaluate"):
     """Loading model"""
     if model is None:
         with open(path + ".args", "rb") as f:
-            args = ArgConfig()
+            args = ArgConfig(["--None"])
             args.namespace = pickle.load(f)
         model = Model(args)
     model_state, _ = fluid.load_dygraph(path)

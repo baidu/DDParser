@@ -137,6 +137,8 @@ class ArgConfig(configparser.ConfigParser):
         train_g.add_arg("--punct", action="store_true", help="whether to include punctuation")
 
         custom_g = ArgumentGroup(parser, "customize", "customized options.")
+        custom_g.add_arg("--None", action="store_true", help="None")
+
         self.build_conf(parser, args)
 
     def build_conf(self, parser, args=None):
