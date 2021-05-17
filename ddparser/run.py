@@ -319,7 +319,7 @@ class DDParser(object):
         if prob:
             args.append("--prob")
         if batch_size:
-            args.append("--batch_size={}", format(batch_size))
+            args.append("--batch_size={}".format(batch_size))
 
         args = ArgConfig(args)
         # Don't instantiate the log handle
