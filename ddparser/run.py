@@ -440,7 +440,7 @@ class DDParser(object):
         """
         if not inputs:
             return
-        if all([isinstance(i, list) and i for i in inputs]):
+        if all([isinstance(i, list) and i and all(i) for i in inputs]):
             predicts = Corpus.load_word_segments(inputs, self.env.fields)
         else:
             logging.warning("please check the foramt of your inputs.")
