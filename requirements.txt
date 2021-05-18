@@ -1,2 +1,4 @@
 paddlepaddle-gpu>=1.8.2.post107
 LAC>=0.1.4
+tqdm
+configparser

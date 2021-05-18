@@ -55,7 +55,7 @@ with open("README.md", "r", encoding='utf8') as fh:
     long_description = fh.read()
 setup(
     name="ddparser",
-    version="0.1.3",
+    version="1.0.3",
     author="Baidu NLP",
     author_email="nlp-parser@baidu.com",
     description="A chinese dependency parser tool by Baidu NLP.",
