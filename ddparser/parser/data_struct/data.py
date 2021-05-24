@@ -27,8 +27,7 @@ except:
 from itertools import chain
 
 import numpy as np
-from paddle.fluid import io
-from paddle.fluid.contrib import reader
+from paddle import io
 
 from ddparser.parser.data_struct import utils
 from ddparser.parser.nets import nn
@@ -44,8 +43,6 @@ class TextDataLoader(object):
         self.use_data_parallel = use_data_parallel
         self.dataloader = io.DataLoader.from_generator(capacity=10, return_list=True, use_multiprocess=use_multiprocess)
         self.dataloader.set_batch_generator(self.generator_creator())
-        if use_data_parallel:
-            self.dataloader = reader.distributed_batch_reader(self.dataloader)
 
     def __call__(self):
         """call"""

@@ -37,6 +37,7 @@ except:
     pass
 import LAC
 import numpy as np
+import paddle.distributed as dist
 from paddle import fluid
 from paddle.fluid import dygraph
 from paddle.fluid import layers
@@ -92,8 +93,8 @@ def train(env):
 
     # init parallel strategy
     if args.use_data_parallel:
-        strategy = dygraph.parallel.prepare_context()
-        model = dygraph.parallel.DataParallel(model, strategy)
+        dist.init_parallel_env()
+        model = paddle.DataParallel(model)
 
     if args.encoding_model.startswith(
             "ernie") and args.encoding_model != "ernie-lstm" or args.encoding_model == 'transformer':
