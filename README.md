@@ -42,7 +42,7 @@ DDParser(Bai**d**u **D**ependency **Parser**)是百度自然语言处理部基�
 ## 快速开始
 
 ### 版本依赖
-* `python`: 2.7,>=3.6.0
+* `python`: ==2.7,>=3.6.0
 * [`paddlepaddle`](https://www.paddlepaddle.org.cn/): >=2.0
 * [`LAC`](https://github.com/baidu/lac): >=2.1
 <br>

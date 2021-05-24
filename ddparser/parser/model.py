@@ -125,9 +125,7 @@ def epoch_train(args, model, optimizer, loader, epoch):
 
         loss = loss_function(s_arc, s_rel, arcs, rels, mask)
         if args.use_data_parallel:
-            loss = model.scale_loss(loss)
             loss.backward()
-            model.apply_collective_grads()
         else:
             loss.backward()
         optimizer.minimize(loss)

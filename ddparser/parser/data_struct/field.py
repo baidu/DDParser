@@ -141,6 +141,7 @@ class Field(RawField):
             sequence = self.tokenize(sequence)
         elif self.tokenizer is not None:
             sequence = self.tokenizer.tokenize(sequence)
+            if not sequence: sequence = [self.unk]
         if self.lower:
             sequence = [token.lower() for token in sequence]
 
