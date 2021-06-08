@@ -212,17 +212,27 @@ class ErnieField(Field):
     def transform(self, sequences):
         """Sequences transform function, such as converting word to id, adding bos tags to sequences, etc."""
         sequences = [[self.preprocess(token) for token in seq] for seq in sequences]
+        postions = []
+        max_token_len = -1
         if self.fix_len <= 0:
             self.fix_len = max(len(token) for seq in sequences for token in seq)
+        for seq in sequences:
+            cur_index = -1
+            if self.bos:
+                cur_index += 1
+                token_position = [cur_index]
+            for token in seq:
+                cur_index += len(token)
+                token_position.append(cur_index)
+            if self.eos:
+                token_position.append(cur_index + 1)
+            postions.append(np.array(token_position))
         if self.use_vocab:
-            sequences = [[[self.vocab[i] for i in token] for token in seq] for seq in sequences]
+            sequences = [[self.vocab[i] for token in seq for i in token] for seq in sequences]
         if self.bos:
-            sequences = [[[self.bos_index]] + seq for seq in sequences]
+            sequences = [[self.bos_index] + seq for seq in sequences]
         if self.eos:
-            sequences = [seq + [[self.eos_index]] for seq in sequences]
-        sequences = [
-            nn.pad_sequence([np.array(ids[:self.fix_len], dtype=np.int64) for ids in seq], self.pad_index, self.fix_len)
-            for seq in sequences
-        ]
+            sequences = [seq + [self.eos_index] for seq in sequences]
 
-        return sequences
+        sequences = [np.array(seq) for seq in sequences]
+        return list(zip(sequences, postions))

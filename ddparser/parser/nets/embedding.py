@@ -146,9 +146,7 @@ class ErnieEmbed(dygraph.Layer):
         lens = nn.reduce_sum(words != pad_index, dim=-1)
         position = layers.cumsum(lens + layers.cast((lens == 0), "int32"), axis=1) - 1
         flat_words = nn.masked_select(words, words != pad_index)
-        flat_words = nn.pad_sequence_paddle(
-            layers.split(flat_words,
-                         layers.reduce_sum(lens, -1).numpy().tolist(), pad_index))
+        flat_words = nn.pad_sequence_paddle(layers.split(flat_words, paddle.sum(lens, -1).numpy().tolist(), pad_index))
         max_len = flat_words.shape[1]
         position = nn.mask_fill(position, position >= max_len, max_len - 1)
         return flat_words, position
@@ -182,20 +180,18 @@ class LSTMByWPEmbed(PretraEmbedding):
     def init_ernie_model(self, args):
         self.word_embed = dygraph.Embedding(size=(args.ernie_vocabs_size, args.lstm_by_wp_embed_size))
 
-    def flat_words(self, words):
-        pad_index = self.args.pad_index
-        lens = nn.reduce_sum(words != pad_index, dim=-1)
-        position = layers.cumsum(lens + layers.cast((lens == 0), "int32"), axis=1) - 1
-        flat_words = nn.masked_select(words, words != pad_index)
-        flat_words = nn.pad_sequence_paddle(
-            layers.split(flat_words,
-                         layers.reduce_sum(lens, -1).numpy().tolist(), pad_index))
-        max_len = flat_words.shape[1]
-        position = nn.mask_fill(position, position >= max_len, max_len - 1)
-        return flat_words, position
+    # def flat_words(self, words):
+    #     pad_index = self.args.pad_index
+    #     lens = nn.reduce_sum(words != pad_index, dim=-1)
+    #     position = layers.cumsum(lens + layers.cast((lens == 0), "int32"), axis=1) - 1
+    #     flat_words = nn.masked_select(words, words != pad_index)
+    #     flat_words = nn.pad_sequence_paddle(layers.split(flat_words, paddle.sum(lens, -1).numpy().tolist(), pad_index))
+    #     max_len = flat_words.shape[1]
+    #     position = nn.mask_fill(position, position >= max_len, max_len - 1)
+    #     return flat_words, position
 
-    def forward(self, words, feats):
-        words, position = self.flat_words(words)
+    def forward(self, words, position, batch_size, max_len, token_num):
+        # words, position = self.flat_words(words)
         word_embed = self.word_embed(words)
         # word_embed = self.embed_dropout(word_embed)
         # concatenate the word and feat representations
@@ -203,7 +199,10 @@ class LSTMByWPEmbed(PretraEmbedding):
         embed = word_embed
         mask = words != self.args.pad_index
         x = self.lstm(embed, mask)
-        x = layers.reshape(nn.index_sample(x, position), shape=position.shape[:2] + [x.shape[2]])
+        flat_position = (layers.elementwise_add(position, (paddle.arange(0, batch_size, step=1, dtype='int64') *
+                                                           max_len).unsqueeze(-1))).reshape((-1, 1))
+        x = x.reshape((-1, x.shape[2]))
+        x = paddle.gather(x, flat_position).reshape((batch_size, token_num, paddle.shape(x)[1]))
         words = paddle.index_sample(words, position)
         x = self.lstm_dropout(x)
 

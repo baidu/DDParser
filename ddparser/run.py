@@ -49,6 +49,8 @@ from ddparser.parser import epoch_evaluate
 from ddparser.parser import epoch_predict
 from ddparser.parser import save
 from ddparser.parser import load
+from ddparser.parser import save_static
+from ddparser.parser import load_static
 from ddparser.parser import decode
 from ddparser.parser import ArgConfig
 from ddparser.parser import Environment
@@ -183,7 +185,10 @@ def evaluate(env):
     logging.info("{} sentences, ".format(len(dataset)) + "{} batches, ".format(len(dataset.loader)) +
                  "{} buckets".format(len(dataset.buckets)))
     logging.info("Load the model")
-    model = load(args.model_path)
+    if args.is_static:
+        model = load_static(args.model_path)
+    else:
+        model = load(args.model_path)
 
     logging.info("Evaluate the dataset")
     start = datetime.datetime.now()
@@ -207,7 +212,10 @@ def predict(env):
     logging.info("{} sentences, {} batches".format(len(dataset), len(dataset.loader)))
 
     logging.info("Load the model")
-    model = load(args.model_path)
+    if args.is_static:
+        model = load_static(args.model_path)
+    else:
+        model = load(args.model_path)
     model.args = args
 
     logging.info("Make predictions on the dataset")
@@ -230,7 +238,10 @@ def predict_query(env):
     """Predict one query"""
     args = env.args
     logging.info("Load the model")
-    model = load(args.model_path)
+    if args.is_static:
+        model = load_static(args.model_path)
+    else:
+        model = load(args.model_path)
     model.eval()
     lac_mode = "seg" if args.feat != "pos" else "lac"
     lac = LAC.LAC(mode=lac_mode)
@@ -283,26 +294,28 @@ class DDParser(object):
                 当default=None时，分桶batch_size默认等于1000，不分桶默认等于50。
     encoding_model:指定模型，可以选lstm、transformer、ernie-1.0、ernie-tiny等
     """
-    def __init__(
-        self,
-        use_cuda=False,
-        tree=True,
-        prob=False,
-        use_pos=False,
-        model_files_path=None,
-        buckets=False,
-        batch_size=None,
-        encoding_model="ernie-lstm",
-    ):
+    def __init__(self,
+                 use_cuda=False,
+                 tree=True,
+                 prob=False,
+                 use_pos=False,
+                 model_files_path=None,
+                 buckets=False,
+                 batch_size=None,
+                 encoding_model="ernie-lstm",
+                 is_static=True):
         if model_files_path is None:
+            model_name = encoding_model
             if encoding_model in ["lstm", "transformer", "ernie-1.0", "ernie-tiny", "ernie-lstm"]:
-                model_files_path = self._get_abs_path(os.path.join("./model_files/", encoding_model))
+                if is_static:
+                    model_name += '-static'
+                model_files_path = self._get_abs_path(os.path.join("./model_files/", model_name))
             else:
                 raise KeyError("Unknown encoding model.")
 
             if not os.path.exists(model_files_path):
                 try:
-                    utils.download_model_from_url(model_files_path, encoding_model)
+                    utils.download_model_from_url(model_files_path, model_name)
                 except Exception as e:
                     logging.error("Failed to download model, please try again")
                     logging.error("error: {}".format(e))
@@ -327,8 +340,11 @@ class DDParser(object):
         args.log_path = None
         self.env = Environment(args)
         self.args = self.env.args
-        fluid.enable_imperative(self.env.place)
-        self.model = load(self.args.model_path)
+        paddle.set_device(self.env.place)
+        if not is_static:
+            self.model = load(self.args.model_path)
+        else:
+            self.model = load_static(self.args.model_path)
         self.model.eval()
         self.lac = None
         self.use_pos = use_pos
@@ -342,6 +358,11 @@ class DDParser(object):
         # set default batch size if batch_size is None and not buckets
         if batch_size is None and not buckets:
             self.args.batch_size = 50
+
+    def save_to_static(self, path):
+        if self.args.prob or self.args.use_pos:
+            raise KeyError("prob and use_por must be false when saving static model.")
+        save_static(path, self.model, self.args, self.env.fields)
 
     def parse(self, inputs):
         """

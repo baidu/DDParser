@@ -19,6 +19,7 @@
 本文件定义biaffine网络
 """
 
+import paddle
 from paddle.fluid import dygraph
 from paddle.fluid import layers
 
@@ -41,9 +42,9 @@ class Biaffine(dygraph.Layer):
         if self.bias_y:
             y = layers.concat((y, layers.ones_like(x[:, :, :1])), axis=-1)
         # x.shape=(b, m, i)
-        b = x.shape[0]
+        b = paddle.shape(x)[0]
         # self.weight.shape=(o, i, j)
-        o = self.weight.shape[0]
+        o = paddle.shape(self.weight)[0]
         x = layers.expand(layers.unsqueeze(x, axes=[1]), expand_times=(1, o, 1, 1))
         weight = layers.expand(layers.unsqueeze(self.weight, axes=[0]), expand_times=(b, 1, 1, 1))
         y = layers.expand(layers.unsqueeze(y, axes=[1]), expand_times=(1, o, 1, 1))
@@ -51,6 +52,6 @@ class Biaffine(dygraph.Layer):
         # s.shape=(b, o, m, n), that is, [batch_size, n_out, seq_len, seq_len]
         s = layers.matmul(layers.matmul(x, weight), layers.transpose(y, perm=(0, 1, 3, 2)))
         # remove dim 1 if n_out == 1
-        if s.shape[1] == 1:
+        if paddle.shape(s)[1] == 1:
             s = layers.squeeze(s, axes=[1])
         return s

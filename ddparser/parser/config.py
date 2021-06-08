@@ -137,6 +137,7 @@ class ArgConfig(configparser.ConfigParser):
         train_g.add_arg("--punct", action="store_true", help="whether to include punctuation")
 
         custom_g = ArgumentGroup(parser, "customize", "customized options.")
+        custom_g.add_arg("--is_static", action="store_true", help="Is it static graph mode?")
         custom_g.add_arg("--None", action="store_true", help="None")
 
         self.build_conf(parser, args)
@@ -293,7 +294,7 @@ class Environment(object):
 
         self.args.update({
             "n_words": len(self.WORD.vocab),
-            "n_feats": self.FEAT and len(self.FEAT.vocab),
+            "n_feats": self.FEAT and getattr(self.FEAT, "vocab", None) and len(self.FEAT.vocab),
             "n_rels": len(self.REL.vocab),
             "pad_index": self.WORD.pad_index,
             "unk_index": self.WORD.unk_index,

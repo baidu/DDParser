@@ -44,7 +44,7 @@ class SharedDropout(dygraph.Layer):
     @staticmethod
     def get_mask(x, p):
         """Generate the mask matrix of the dropout by the input."""
-        mask = layers.uniform_random(shape=x.shape, min=0, max=1) >= p
+        mask = layers.uniform_random(shape=paddle.shape(x), min=0, max=1) >= p
         mask = layers.cast(mask, 'float32')
         mask = mask / (1 - p)
         return mask
@@ -60,7 +60,7 @@ class IndependentDropout(dygraph.Layer):
     def forward(self, *items):
         """Forward network"""
         if self.training and self.p > 0:
-            masks = [layers.uniform_random(shape=x.shape[:2], min=0, max=1) >= self.p for x in items]
+            masks = [layers.uniform_random(shape=paddle.shape(x)[:2], min=0, max=1) >= self.p for x in items]
             masks = [layers.cast(x, 'float32') for x in masks]
             total = layers.elementwise_add(*masks)
             scale = len(items) / layers.elementwise_max(total, layers.ones_like(total))

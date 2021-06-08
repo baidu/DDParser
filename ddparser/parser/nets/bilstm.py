@@ -53,7 +53,7 @@ class BiLSTM(dygraph.Layer):
 
     def forward(self, x, seq_mask):
         """Forward network"""
-        seq_lens = nn.reduce_sum(seq_mask, -1)
+        seq_lens = paddle.sum(paddle.cast(seq_mask, 'int64'), -1)
         y, _ = self.lstm(x, sequence_length=seq_lens)
 
         return y

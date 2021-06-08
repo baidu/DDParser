@@ -57,9 +57,18 @@ class TextDataLoader(object):
                 for data, field in zip(raw_batch, self.fields):
                     if isinstance(data[0], np.ndarray):
                         data = nn.pad_sequence(data, field.pad_index)
+                        batch.append(data)
+                    elif field.name == 'word' and isinstance(data[0], tuple) and len(data[0]) == 2:
+                        seqs, poss = zip(*data)
+                        seqs = nn.pad_sequence(seqs, field.pad_index)
+                        max_len = max([len(seq) for seq in seqs])
+                        seqs = nn.pad_sequence(seqs, field.pad_index)
+                        poss = nn.pad_sequence(poss, max_len - 1)
+                        batch.append(seqs)
+                        batch.append(poss)
                     elif isinstance(data[0], Iterable):
                         data = [nn.pad_sequence(f, field.pad_index) for f in zip(*data)]
-                    batch.append(data)
+                        batch.append(data)
                 yield batch
 
         return __reader

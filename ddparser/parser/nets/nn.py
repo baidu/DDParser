@@ -274,24 +274,24 @@ def mask_fill(input, mask, value):
         [4, 0, 0]
     ]
     """
-    return input * layers.logical_not(mask) + layers.cast(mask, input.dtype) * value
+    return layers.elementwise_add(input * layers.logical_not(mask), layers.cast(mask, input.dtype) * value)
 
 
 def unsqueeze(input, axes):
     """Increase the number of axes of input"""
     input_dtype = input.dtype
-    if input_dtype == VarDesc.VarType.BOOL:
+    if input_dtype == paddle.bool:
         input = layers.cast(input, 'int32')
     output = layers.unsqueeze(input, axes=axes)
-    if input_dtype == VarDesc.VarType.BOOL:
+    if input_dtype == paddle.bool:
         output = layers.cast(output, 'bool')
     return output
 
 
-def reduce_sum(input, dim):
+def reduce_sum(input, axis):
     """Computes the sum of tensor elements over the given dimension."""
     input_dtype = input.dtype
-    if input_dtype == VarDesc.VarType.BOOL:
-        input = layers.cast(input, 'int32')
-    output = layers.reduce_sum(input, dim=dim)
+    if input_dtype == paddle.bool:
+        input = paddle.cast(input, 'int32')
+    output = paddle.sum(input, axis=axis)
     return output

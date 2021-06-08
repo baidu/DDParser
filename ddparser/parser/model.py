@@ -31,10 +31,12 @@ except ImportError as e:
     import pickle  #python 3
 
 import numpy as np
+import paddle
 from paddle import fluid
 from paddle.fluid import dygraph
 from paddle.fluid import initializer
 from paddle.fluid import layers
+from paddle.static import InputSpec
 
 from ddparser.parser.config import ArgConfig
 from ddparser.parser.data_struct import utils
@@ -54,14 +56,10 @@ class Model(dygraph.Layer):
     def __init__(self, args):
         super(Model, self).__init__()
         self.args = args
-        if args.encoding_model == "lstm":
-            self.embed = LSTMEmbed(args)
-        elif args.encoding_model == "transformer":
-            self.embed = TranEmbed(args)
-        elif args.encoding_model == "ernie-lstm":
+        if args.encoding_model == "ernie-lstm":
             self.embed = LSTMByWPEmbed(args)
-        elif args.encoding_model.startswith("ernie"):
-            self.embed = ErnieEmbed(args)
+        else:
+            raise KeyError("error encoding_model({args.encoding_model}) should be ernie-lstm.")
         mlp_input_size = self.embed.mlp_input_size
 
         # mlp layer
@@ -74,11 +72,12 @@ class Model(dygraph.Layer):
         self.arc_attn = Biaffine(n_in=args.n_mlp_arc, bias_x=True, bias_y=False)
         self.rel_attn = Biaffine(n_in=args.n_mlp_rel, n_out=args.n_rels, bias_x=True, bias_y=True)
 
-    def forward(self, words, feats=None):
+    def forward(self, words, feats, batch_size, max_len, token_num):
         """Forward network"""
         # batch_size, seq_len = words.shape
         # get embedding
-        words, x = self.embed(words, feats)
+        words, x = self.embed(words, feats, batch_size, max_len, token_num)
+
         mask = layers.logical_and(words != self.args.pad_index, words != self.args.eos_index)
 
         # apply MLPs to the BiLSTM output states
@@ -94,8 +93,9 @@ class Model(dygraph.Layer):
         s_rel = layers.transpose(self.rel_attn(rel_d, rel_h), perm=(0, 2, 3, 1))
         # set the scores that exceed the length of each sentence to -1e5
         s_arc_mask = paddle.unsqueeze(mask, 1)
-        s_arc = s_arc * s_arc_mask + paddle.scale(
-            paddle.cast(s_arc_mask, 'int32'), scale=1e5, bias=-1, bias_after_scale=False)
+        s_arc = layers.elementwise_add(
+            s_arc * paddle.cast(s_arc_mask, 'float32'),
+            paddle.scale(paddle.cast(s_arc_mask, 'float32'), scale=1e5, bias=-1, bias_after_scale=False))
 
         return s_arc, s_rel, words
 
@@ -112,11 +112,13 @@ def epoch_train(args, model, optimizer, loader, epoch):
         model.clear_gradients()
 
         if args.encoding_model.startswith("ernie"):
-            words, arcs, rels = inputs
-            s_arc, s_rel, words = model(words)
+            words, position, arcs, rels = inputs
+            batch_size = np.array([words.shape[0]], dtype='int32')
+            max_len = np.array([words.shape[1]], dtype='int32')
+            token_num = np.array([position.shape[1]], dtype='int32')
+            s_arc, s_rel, words = model(words, position, batch_size, max_len, token_num)
         else:
-            words, feats, arcs, rels = inputs
-            s_arc, s_rel, words = model(words, feats)
+            logging.FATAL("Localzation branch only supports ernie-lstm!")
 
         mask = layers.logical_and(
             layers.logical_and(words != pad_index, words != bos_index),
@@ -148,11 +150,14 @@ def epoch_evaluate(args, model, loader, puncts):
 
     for batch, inputs in enumerate(loader(), start=1):
         if args.encoding_model.startswith("ernie"):
-            words, arcs, rels = inputs
-            s_arc, s_rel, words = model(words)
+            words, position, arcs, rels = inputs
+            batch_size = np.array([words.shape[0]], dtype='int32')
+            max_len = np.array([words.shape[1]], dtype='int32')
+            token_num = np.array([position.shape[1]], dtype='int32')
+            s_arc, s_rel, words = model(words, position, batch_size, max_len, token_num)
         else:
-            words, feats, arcs, rels = inputs
-            s_arc, s_rel, words = model(words, feats)
+            raise KeyError("error encoding_model({args.encoding_model}) should be ernie-lstm.")
+
         mask = layers.logical_and(
             layers.logical_and(words != pad_index, words != bos_index),
             words != eos_index,
@@ -186,16 +191,19 @@ def epoch_predict(env, args, model, loader):
     eos_index = args.eos_index
     for batch, inputs in enumerate(loader(), start=1):
         if args.encoding_model.startswith("ernie"):
-            words = inputs[0]
-            s_arc, s_rel, words = model(words)
+            words, position = inputs[0], inputs[1]
+            batch_size = np.array([words.shape[0]], dtype='int32')
+            max_len = np.array([words.shape[1]], dtype='int32')
+            token_num = np.array([position.shape[1]], dtype='int32')
+            s_arc, s_rel, words = model(words, position, batch_size, max_len, token_num)
+
         else:
-            words, feats = inputs
-            s_arc, s_rel, words = model(words, feats)
+            raise KeyError("error encoding_model({args.encoding_model}) should be ernie-lstm.")
         mask = layers.logical_and(
             layers.logical_and(words != pad_index, words != bos_index),
             words != eos_index,
         )
-        lens = nn.reduce_sum(mask, -1)
+        lens = nn.reduce_sum(paddle.cast(mask, dtype='int32'), -1)
         arc_preds, rel_preds = decode(args, s_arc, s_rel, mask)
         arcs.extend(layers.split(nn.masked_select(arc_preds, mask), lens.numpy().tolist()))
         rels.extend(layers.split(nn.masked_select(rel_preds, mask), lens.numpy().tolist()))
@@ -263,3 +271,28 @@ def load(path, model=None, mode="evaluate"):
     model_state, _ = fluid.load_dygraph(path)
     model.set_dict(model_state)
     return model
+
+
+def load_static(path):
+    """Loading model in static graph"""
+    model = paddle.jit.load(path)
+    return model
+
+
+def save_static(path, model, args, fields):
+    """Saving model in static graph"""
+    model = paddle.jit.to_static(model,
+                                 input_spec=[
+                                     paddle.static.InputSpec(shape=[None, 200], dtype='int64', name='words'),
+                                     paddle.static.InputSpec(shape=[None, 200], dtype='int64', name='position'),
+                                     paddle.static.InputSpec(shape=[1], dtype='int32', name='batch_size'),
+                                     paddle.static.InputSpec(shape=[1], dtype='int32', name='max_len'),
+                                     paddle.static.InputSpec(shape=[1], dtype='int32', name='token_num')
+                                 ])
+    model_path = os.path.join(path, 'model')
+    fileds_path = os.path.join(path, 'fields')
+    paddle.jit.save(model, model_path)
+    with open(model_path + ".args", "wb") as f:
+        pickle.dump(args.namespace, f, protocol=2)
+    with open(fileds_path, "wb") as f:
+        pickle.dump(fields, f, protocol=2)
