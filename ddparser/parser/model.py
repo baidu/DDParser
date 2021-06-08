@@ -58,7 +58,7 @@ class Model(dygraph.Layer):
             self.embed = LSTMEmbed(args)
         elif args.encoding_model == "transformer":
             self.embed = TranEmbed(args)
-        elif args.encoding_model == "ernie-lstm":
+        elif args.encoding_model in ["ernie-lstm", "ernie-lstm-static"]:
             self.embed = LSTMByWPEmbed(args)
         elif args.encoding_model.startswith("ernie"):
             self.embed = ErnieEmbed(args)
@@ -124,14 +124,12 @@ def epoch_train(args, model, optimizer, loader, epoch):
         )
 
         loss = loss_function(s_arc, s_rel, arcs, rels, mask)
-        if args.use_data_parallel:
-            loss.backward()
-        else:
-            loss.backward()
+        loss.backward()
+        
         optimizer.minimize(loss)
         total_loss += loss.numpy().item()
         logging.info("epoch: {}, batch: {}/{}, batch_size: {}, loss: {:.4f}".format(
-            epoch, batch, math.ceil(len(loader) / args.nranks), len(words),
+            epoch, batch, math.ceil(len(loader)), len(words),
             loss.numpy().item()))
     total_loss /= len(loader)
     return total_loss

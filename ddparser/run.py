@@ -35,7 +35,7 @@ try:
     sys.setdefaultencoding('utf8')
 except:
     pass
-import LAC
+import stanza
 import numpy as np
 import paddle.distributed as dist
 from paddle import fluid
@@ -97,25 +97,20 @@ def train(env):
         model = paddle.DataParallel(model)
 
     if args.encoding_model.startswith(
-            "ernie") and args.encoding_model != "ernie-lstm" or args.encoding_model == 'transformer':
+            "ernie") and args.encoding_model not in ["ernie-lstm", "ernie-lstm-en"] or args.encoding_model == 'transformer':
         args['lr'] = args.ernie_lr
     else:
         args['lr'] = args.lstm_lr
 
-    if args.encoding_model.startswith("ernie") and args.encoding_model != "ernie-lstm":
+    if args.encoding_model.startswith("ernie") and args.encoding_model not in ["ernie-lstm", "ernie-lstm-en"]:
         max_steps = 100 * len(train.loader)
         decay = LinearDecay(args.lr, int(args.warmup_proportion * max_steps), max_steps)
-        clip = args.ernie_clip
     else:
         decay = dygraph.ExponentialDecay(learning_rate=args.lr, decay_steps=args.decay_steps, decay_rate=args.decay)
-        clip = args.clip
 
-    if args.use_cuda:
-        grad_clip = fluid.clip.GradientClipByNorm(clip_norm=clip)
-    else:
-        grad_clip = fluid.clip.GradientClipByGlobalNorm(clip_norm=clip)
+    grad_clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.clip)
 
-    if args.encoding_model.startswith("ernie") and args.encoding_model != "ernie-lstm":
+    if args.encoding_model.startswith("ernie") and args.encoding_model not in ["ernie-lstm", "ernie-lstm-en"]:
         optimizer = AdamW(
             learning_rate=decay,
             parameter_list=model.parameters(),
@@ -295,7 +290,7 @@ class DDParser(object):
         encoding_model="ernie-lstm",
     ):
         if model_files_path is None:
-            if encoding_model in ["lstm", "transformer", "ernie-1.0", "ernie-tiny", "ernie-lstm"]:
+            if encoding_model in ["lstm", "transformer", "ernie-1.0", "ernie-tiny", "ernie-lstm", "ernie-lstm-en", "lstm-en"]:
                 model_files_path = self._get_abs_path(os.path.join("./model_files/", encoding_model))
             else:
                 raise KeyError("Unknown encoding model.")
@@ -327,10 +322,14 @@ class DDParser(object):
         args.log_path = None
         self.env = Environment(args)
         self.args = self.env.args
-        fluid.enable_imperative(self.env.place)
+        paddle.set_device(self.env.place)
         self.model = load(self.args.model_path)
         self.model.eval()
-        self.lac = None
+        self.nlp = stanza.Pipeline('en',
+                      processors='tokenize,pos',
+                      dir='./stanza_resources',
+                      use_gpu=True,
+                      depparse_batch_size=10000)
         self.use_pos = use_pos
         # buckets=None if not buckets else defaults
         if not buckets:
@@ -342,6 +341,33 @@ class DDParser(object):
         # set default batch size if batch_size is None and not buckets
         if batch_size is None and not buckets:
             self.args.batch_size = 50
+            
+    def get_dp_result(self, sentences):
+        new_sentence = "\n\n\1\n\n".join(sentences)
+        doc = self.nlp(new_sentence)
+        pre_sent_len = 0
+        word_idx = 0
+        postag = []
+        words = []
+        
+        result = []
+        for _sent in doc.sentences:
+            word_idx += pre_sent_len
+            for _word in _sent.words:
+                if _word.text == '\1' and _word.id == 1:
+                    result.append((words, postag))
+                    words, postag = [], []
+                    pre_sent_len, word_idx = 0, 0
+                    break
+                words.append(_word.text)
+                postag.append(_word.upos)
+
+            else:
+                pre_sent_len = len(_sent.words)
+        else:
+            if words and postag:
+                result.append((words, postag))
+        return result
 
     def parse(self, inputs):
         """
@@ -370,8 +396,8 @@ class DDParser(object):
         [{'word': ['百度', '是', '一家', '高科技', '公司'], 'postag': ['ORG', 'v', 'm', 'n', 'n'],
         'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'], 'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
         """
-        if not self.lac:
-            self.lac = LAC.LAC(mode="lac" if self.use_pos else "seg", use_cuda=self.args.use_cuda)
+        # if not self.lac:
+        #     self.lac = LAC.LAC(mode="lac" if self.use_pos else "seg", use_cuda=self.args.use_cuda)
         if not inputs:
             return
         if isinstance(inputs, six.string_types):
@@ -386,7 +412,7 @@ class DDParser(object):
                 return
 
             while position < len(inputs):
-                lac_results += self.lac.run(inputs[position:position + self.args.batch_size])
+                lac_results += self.get_dp_result(inputs[position:position + self.args.batch_size])
                 position += self.args.batch_size
             predicts = Corpus.load_lac_results(lac_results, self.env.fields)
         else:
@@ -478,8 +504,10 @@ class DDParser(object):
 if __name__ == "__main__":
     logging.info("init arguments.")
     args = ArgConfig()
+    
     logging.info("init environment.")
     env = Environment(args)
+    
     logging.info("Override the default configs\n{}".format(env.args))
     logging.info("{}\n{}\n{}\n{}".format(env.WORD, env.FEAT, env.ARC, env.REL))
     logging.info("Set the max num of threads to {}".format(env.args.threads))

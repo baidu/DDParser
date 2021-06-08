@@ -206,6 +206,7 @@ class PretrainedModel(object):
     resource_map = {
         'ernie-1.0': bce + 'model-ernie1.0.1.tar.gz',
         'ernie-lstm': bce + 'model-ernie1.0.1.tar.gz',
+        'ernie-lstm-en': bce + 'model-ernie2.0-en.1.tar.gz',
         'ernie-2.0-en': bce + 'model-ernie2.0-en.1.tar.gz',
         'ernie-2.0-large-en': bce + 'model-ernie2.0-large-en.1.tar.gz',
         'ernie-tiny': bce + 'model-ernie_tiny.1.tar.gz',

@@ -1,5 +1,5 @@
 #!/bin/bash
-GPUS=0,1
+GPUS=0,1,2,3
 export FLAGS_fraction_of_gpu_memory_to_use=0.99
 export FLAGS_eager_delete_tensor_gb=0.0
 export FLAGS_fast_eager_deletion_mode=True
@@ -12,12 +12,12 @@ python -u -m paddle.distributed.launch  --selected_gpus=$GPUS run.py \
                 --mode=train \
                 --use_cuda \
                 --use_data_parallel \
-                --feat=none \
-                --model_files=model_files/baidu \
-                --encoding_model=ernie-lstm \
+                --feat=pos \
+                --model_files=model_files/ud-en-pos-lstm-nltk \
+                --encoding_model=lstm \
                 --preprocess \
-                --train_data_path=data/baidu/train.txt \
-                --valid_data_path=data/baidu/dev.txt \
-                --test_data_path=data/baidu/test.txt \
+                --train_data_path=data/baidu/ud-treebanks-v2.7/all_english.conllu_nltk \
+                --valid_data_path=data/baidu/ud-treebanks-v2.7/UD_English-EWT_nltk/en_ewt-ud-dev.conllu \
+                --test_data_path=data/baidu/ud-treebanks-v2.7/UD_English-EWT_nltk/en_ewt-ud-test.conllu  \
                 --buckets=15 \
-                --batch_size=1000
+                --batch_size=20000
