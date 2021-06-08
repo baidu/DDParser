@@ -43,7 +43,6 @@ bos = '<bos>'
 eos = '<eos>'
 
 DOWNLOAD_MODEL_PATH_DICT = {
-    'ernie-lstm': "https://ddparser.bj.bcebos.com/DDParser-ernie-lstm-1.0.3.tar.gz",
 }
 
 

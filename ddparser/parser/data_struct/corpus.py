@@ -132,7 +132,7 @@ class Corpus(object):
         sentences = []
         fields = [fd if fd is not None else Field(str(i)) for i, fd in enumerate(fields)]
         for _input in inputs:
-            if isinstance(_input[0], list):
+            if isinstance(_input[0], (list, tuple)):
                 tokens, poss = _input
             else:
                 tokens = _input

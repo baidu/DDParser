@@ -28,6 +28,7 @@ import math
 import pickle
 
 import numpy as np
+import paddle
 from paddle import fluid
 from paddle.fluid import dygraph
 
@@ -130,7 +131,7 @@ class ArgConfig(configparser.ConfigParser):
         train_g.add_arg(
             "--encoding_model",
             default="ernie-lstm",
-            choices=["lstm", "transformer", "ernie-1.0", "ernie-tiny", "ernie-lstm"],
+            choices=["lstm", "transformer", "ernie-1.0", "ernie-tiny", "ernie-lstm", "ernie-lstm-en", "ernie-2.0-en", "lstm-en"],
             help="choices of encode model",
         )
         train_g.add_arg("--buckets", default=15, type=int, help="max num of buckets to use")
@@ -148,8 +149,8 @@ class ArgConfig(configparser.ConfigParser):
         self.namespace = argparse.Namespace()
         self.update(
             dict((name, ast.literal_eval(value)) for section in self.sections() for name, value in self.items(section)))
-        args.nranks = fluid.dygraph.ParallelEnv().nranks
-        args.local_rank = fluid.dygraph.ParallelEnv().local_rank
+        args.nranks = paddle.distributed.get_world_size()
+        args.local_rank = paddle.distributed.get_rank()
         args.fields_path = os.path.join(args.model_files, "fields")
         args.model_path = os.path.join(args.model_files, "model")
         # update config from args
@@ -198,12 +199,11 @@ class Environment(object):
         if args.log_path:
             utils.init_log(args.log_path, args.local_rank, args.log_level)
         # init seed
-        fluid.default_main_program().random_seed = args.seed
+        paddle.seed(args.seed) 
         np.random.seed(args.seed)
         # init place
         if args.use_cuda:
             self.place = "gpu"
-
         else:
             self.place = "cpu"
 
@@ -212,9 +212,8 @@ class Environment(object):
             os.makedirs(self.args.model_files)
         if not os.path.exists(args.fields_path) or args.preprocess:
             logging.info("Preprocess the data")
-            if args.encoding_model in ["ernie-1.0", "ernie-tiny", "ernie-lstm"]:
+            if args.encoding_model in ["ernie-1.0", "ernie-tiny", "ernie-lstm", "ernie-lstm-en", "ernie-2.0-en"]:
                 tokenizer = ErnieTokenizer.from_pretrained(args.encoding_model)
-                args["ernie_vocabs_size"] = len(tokenizer.vocab)
                 self.WORD = ErnieField(
                     "word",
                     pad=tokenizer.pad_token,
@@ -260,7 +259,8 @@ class Environment(object):
             if args.feat == "char":
                 self.fields = CoNLL(FORM=(self.WORD, self.FEAT), HEAD=self.ARC, DEPREL=self.REL)
             else:
-                self.fields = CoNLL(FORM=self.WORD, CPOS=self.FEAT, HEAD=self.ARC, DEPREL=self.REL)
+                # FIXME change for nltk postag
+                self.fields = CoNLL(FORM=self.WORD, POS=self.FEAT, HEAD=self.ARC, DEPREL=self.REL)
 
             train = Corpus.load(args.train_data_path, self.fields)
 
@@ -281,11 +281,12 @@ class Environment(object):
             if isinstance(self.fields.FORM, tuple):
                 self.WORD, self.FEAT = self.fields.FORM
             else:
-                self.WORD, self.FEAT = self.fields.FORM, self.fields.CPOS
+                self.WORD, self.FEAT = self.fields.FORM, self.fields.POS
             self.ARC, self.REL = self.fields.HEAD, self.fields.DEPREL
 
         if args.encoding_model.startswith("ernie"):
             vocab_items = self.WORD.vocab.items()
+            args["ernie_vocabs_size"] = len(self.WORD.tokenizer.vocab)
         else:
             vocab_items = self.WORD.vocab.stoi.items()
 

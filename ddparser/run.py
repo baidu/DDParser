@@ -35,7 +35,8 @@ try:
     sys.setdefaultencoding('utf8')
 except:
     pass
-import LAC
+import nltk
+nltk.data.path.insert(0, os.path.dirname(__file__) + '/nltk_data')
 import numpy as np
 import paddle.distributed as dist
 from paddle import fluid
@@ -97,25 +98,20 @@ def train(env):
         model = paddle.DataParallel(model)
 
     if args.encoding_model.startswith(
-            "ernie") and args.encoding_model != "ernie-lstm" or args.encoding_model == 'transformer':
+            "ernie") and args.encoding_model not in ["ernie-lstm", "ernie-lstm-en"] or args.encoding_model == 'transformer':
         args['lr'] = args.ernie_lr
     else:
         args['lr'] = args.lstm_lr
 
-    if args.encoding_model.startswith("ernie") and args.encoding_model != "ernie-lstm":
+    if args.encoding_model.startswith("ernie") and args.encoding_model not in ["ernie-lstm", "ernie-lstm-en"]:
         max_steps = 100 * len(train.loader)
         decay = LinearDecay(args.lr, int(args.warmup_proportion * max_steps), max_steps)
-        clip = args.ernie_clip
     else:
         decay = dygraph.ExponentialDecay(learning_rate=args.lr, decay_steps=args.decay_steps, decay_rate=args.decay)
-        clip = args.clip
 
-    if args.use_cuda:
-        grad_clip = fluid.clip.GradientClipByNorm(clip_norm=clip)
-    else:
-        grad_clip = fluid.clip.GradientClipByGlobalNorm(clip_norm=clip)
+    grad_clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.clip)
 
-    if args.encoding_model.startswith("ernie") and args.encoding_model != "ernie-lstm":
+    if args.encoding_model.startswith("ernie") and args.encoding_model not in ["ernie-lstm", "ernie-lstm-en"]:
         optimizer = AdamW(
             learning_rate=decay,
             parameter_list=model.parameters(),
@@ -295,7 +291,7 @@ class DDParser(object):
         encoding_model="ernie-lstm",
     ):
         if model_files_path is None:
-            if encoding_model in ["lstm", "transformer", "ernie-1.0", "ernie-tiny", "ernie-lstm"]:
+            if encoding_model in ["lstm", "transformer", "ernie-1.0", "ernie-tiny", "ernie-lstm", "lstm-en"]:
                 model_files_path = self._get_abs_path(os.path.join("./model_files/", encoding_model))
             else:
                 raise KeyError("Unknown encoding model.")
@@ -327,10 +323,10 @@ class DDParser(object):
         args.log_path = None
         self.env = Environment(args)
         self.args = self.env.args
-        fluid.enable_imperative(self.env.place)
+        paddle.set_device(self.env.place)
         self.model = load(self.args.model_path)
         self.model.eval()
-        self.lac = None
+
         self.use_pos = use_pos
         # buckets=None if not buckets else defaults
         if not buckets:
@@ -338,10 +334,25 @@ class DDParser(object):
         if args.prob:
             self.env.fields = self.env.fields._replace(PHEAD=Field("prob"))
         if self.use_pos:
-            self.env.fields = self.env.fields._replace(CPOS=Field("postag"))
+            self.env.fields = self.env.fields._replace(POS=Field("postag"))
         # set default batch size if batch_size is None and not buckets
         if batch_size is None and not buckets:
             self.args.batch_size = 50
+            
+    def get_seg_and_pos(self, sentences):
+        results = []
+        for sentence in sentences:
+            tokens = nltk.word_tokenize(sentence)
+            tagged = nltk.pos_tag(tokens)
+        results.append(list(zip(*tagged)))
+        return results
+    
+    def get_pos(self, seg_tokens):
+        results = []
+        for tokens in seg_tokens:
+            tagged = nltk.pos_tag(tokens)
+        results.append(list(zip(*tagged)))
+        return results
 
     def parse(self, inputs):
         """
@@ -370,14 +381,12 @@ class DDParser(object):
         [{'word': ['百度', '是', '一家', '高科技', '公司'], 'postag': ['ORG', 'v', 'm', 'n', 'n'],
         'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'], 'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
         """
-        if not self.lac:
-            self.lac = LAC.LAC(mode="lac" if self.use_pos else "seg", use_cuda=self.args.use_cuda)
         if not inputs:
             return
         if isinstance(inputs, six.string_types):
             inputs = [inputs]
         if all([isinstance(i, six.string_types) and i for i in inputs]):
-            lac_results = []
+            nltk_results = []
             position = 0
             try:
                 inputs = [query if isinstance(query, six.text_type) else query.decode("utf-8") for query in inputs]
@@ -386,9 +395,9 @@ class DDParser(object):
                 return
 
             while position < len(inputs):
-                lac_results += self.lac.run(inputs[position:position + self.args.batch_size])
+                nltk_results += self.get_seg_and_pos(inputs[position:position + self.args.batch_size])
                 position += self.args.batch_size
-            predicts = Corpus.load_lac_results(lac_results, self.env.fields)
+            predicts = Corpus.load_lac_results(nltk_results, self.env.fields)
         else:
             logging.warning("please check the foramt of your inputs.")
             return
@@ -442,7 +451,8 @@ class DDParser(object):
         if not inputs:
             return
         if all([isinstance(i, list) and i and all(i) for i in inputs]):
-            predicts = Corpus.load_word_segments(inputs, self.env.fields)
+            nltk_results = self.get_pos(inputs)
+            predicts = Corpus.load_lac_results(nltk_results, self.env.fields)
         else:
             logging.warning("please check the foramt of your inputs.")
             return
@@ -466,9 +476,7 @@ class DDParser(object):
             predicts.prob = [pred_probs[i] for i in indices]
 
         outputs = predicts.get_result()
-        if outputs[0].get("postag", None):
-            for output in outputs:
-                del output["postag"]
+
         return outputs
 
     def _get_abs_path(self, path):
@@ -478,8 +486,10 @@ class DDParser(object):
 if __name__ == "__main__":
     logging.info("init arguments.")
     args = ArgConfig()
+    
     logging.info("init environment.")
     env = Environment(args)
+    
     logging.info("Override the default configs\n{}".format(env.args))
     logging.info("{}\n{}\n{}\n{}".format(env.WORD, env.FEAT, env.ARC, env.REL))
     logging.info("Set the max num of threads to {}".format(env.args.threads))
