@@ -9,9 +9,10 @@ set -x
 python  run.py \
         --mode=evaluate \
         --use_cuda \
-        --model_files=model_files/baidu \
+        --model_files=model_files/ernie-lstm-static \
         --encoding_model=ernie-lstm \
         --test_data_path=data/baidu/test.txt \
         --buckets=15 \
+        --is_static \
         --tree
 

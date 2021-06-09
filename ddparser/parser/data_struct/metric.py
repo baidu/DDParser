@@ -76,3 +76,55 @@ class Metric(object):
     def __gt__(self, other):
         """gt"""
         return self.score > other
+
+class MetricInfer(object):
+    def __init__(self, eps=1e-8):
+        super(MetricInfer, self).__init__()
+
+        self.eps = eps
+        self.total = 0.0
+        self.correct_arcs = 0.0
+        self.correct_rels = 0.0
+
+    def __repr__(self):
+        """repr"""
+        return "UAS: {:6.2%} LAS: {:6.2%}".format(self.uas, self.las)
+
+    def __call__(self, arc_preds, rel_preds, arc_golds, rel_golds, mask):
+        """call"""
+        arc_mask = (arc_preds == arc_golds)[mask]
+        rel_mask = np.logical_and((rel_preds == rel_golds)[mask], arc_mask)
+        self.total += len(arc_mask)
+        self.correct_arcs += np.sum(arc_mask).item()
+        self.correct_rels += np.sum(rel_mask).item()
+
+    @property
+    def score(self):
+        """score"""
+        return self.las
+
+    @property
+    def uas(self):
+        """uas"""
+        return self.correct_arcs / (self.total + self.eps)
+
+    @property
+    def las(self):
+        """las"""
+        return self.correct_rels / (self.total + self.eps)
+
+    def __lt__(self, other):
+        """lt"""
+        return self.score < other
+
+    def __le__(self, other):
+        """le"""
+        return self.score <= other
+
+    def __ge__(self, other):
+        """ge"""
+        return self.score >= other
+
+    def __gt__(self, other):
+        """gt"""
+        return self.score > other

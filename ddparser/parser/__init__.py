@@ -19,7 +19,9 @@
 
 from .model import decode
 from .model import epoch_evaluate
+from .model import epoch_evaluate_infer
 from .model import epoch_predict
+from .model import epoch_predict_infer
 from .model import epoch_train
 from .model import load
 from .model import loss_function
@@ -31,6 +33,6 @@ from .config import ArgConfig
 from .config import Environment
 
 __all__ = [
-    'decode', 'epoch_evaluate', 'epoch_predict', 'epoch_train', 'load', 'loss_function', 'save', 'Model', 'ArgConfig',
+    'decode', 'epoch_evaluate', 'epoch_predict',  'epoch_evaluate_infer', 'epoch_predict_infer', 'epoch_train', 'load', 'loss_function', 'save', 'Model', 'ArgConfig',
     'Environment', 'save_static', 'load_static'
 ]

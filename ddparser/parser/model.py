@@ -29,6 +29,7 @@ try:
     import cPickle as pickle  #python 2
 except ImportError as e:
     import pickle  #python 3
+from functools import reduce
 
 import numpy as np
 import paddle
@@ -37,11 +38,13 @@ from paddle.fluid import dygraph
 from paddle.fluid import initializer
 from paddle.fluid import layers
 from paddle.static import InputSpec
+import paddle.inference as paddle_infer
 
 from ddparser.parser.config import ArgConfig
 from ddparser.parser.data_struct import utils
 from ddparser.parser.data_struct import Embedding
 from ddparser.parser.data_struct import Metric
+from ddparser.parser.data_struct import MetricInfer
 from ddparser.parser.nets import nn
 from ddparser.parser.nets import Biaffine
 from ddparser.parser.nets import ErnieEmbed
@@ -181,6 +184,60 @@ def epoch_evaluate(args, model, loader, puncts):
 
     return total_loss, metric
 
+@dygraph.no_grad
+def epoch_evaluate_infer(args, model, loader, puncts, input_handles, output_names):
+    """Evaluate in one epoch"""
+    total_loss, metric = 0, MetricInfer()
+    pad_index = args.pad_index
+    bos_index = args.bos_index
+    eos_index = args.eos_index
+
+    for batch, inputs in enumerate(loader(), start=1):
+        if args.encoding_model.startswith("ernie"):
+            words, position, arcs, rels = inputs
+            words = words.numpy()
+            position = position.numpy()
+            arcs = arcs.numpy()
+            rels = rels.numpy()
+            batch_size = np.array([words.shape[0]], dtype='int32')
+            max_len = np.array([words.shape[1]], dtype='int32')
+            token_num = np.array([position.shape[1]], dtype='int32')
+            inputs = [words, position, batch_size, max_len, token_num]
+            for handle, _input in zip(input_handles, inputs):
+                handle.reshape(_input.shape)
+                handle.copy_from_cpu(_input)
+            model.run()
+            output_names = model.get_output_names()
+            outputs = []
+            for output_name in output_names:
+                output_handle = model.get_output_handle(output_name)
+                outputs.append(output_handle.copy_to_cpu())
+            s_arc, s_rel, words = outputs
+        else:
+            raise KeyError("error encoding_model({args.encoding_model}) should be ernie-lstm.")
+
+        mask = np.logical_and(
+            np.logical_and(words != pad_index, words != bos_index),
+            words != eos_index,
+        )
+        lens = np.sum(mask, -1)
+        arc_preds, rel_preds = decode_infer(args, s_arc, s_rel, mask, lens)
+        
+        # ignore all punctuation if not specified
+        # if not args.punct:
+        #     punct_mask = layers.reduce_all(
+        #         layers.expand(layers.unsqueeze(words, -1),
+        #                       (1, 1, puncts.shape[0])) != layers.expand(layers.reshape(puncts,
+        #                                                                                (1, 1, -1)), words.shape + [1]),
+        #         dim=-1)
+
+        #     mask = layers.logical_and(mask, punct_mask)
+
+        metric(arc_preds, rel_preds, arcs, rels, mask)
+
+
+    return metric
+
 
 @dygraph.no_grad
 def epoch_predict(env, args, model, loader):
@@ -220,6 +277,55 @@ def epoch_predict(env, args, model, loader):
 
     return arcs, rels, probs
 
+@dygraph.no_grad
+def epoch_predict_infer(env, args, model, loader, input_handles, output_names):
+    """Predict in one epoch"""
+    arcs, rels, probs = [], [], []
+    pad_index = args.pad_index
+    bos_index = args.bos_index
+    eos_index = args.eos_index
+    for batch, inputs in enumerate(loader(), start=1):
+        if args.encoding_model.startswith("ernie"):
+            words, position = inputs[0].numpy(), inputs[1].numpy()
+            batch_size = np.array([words.shape[0]], dtype='int32')
+            max_len = np.array([words.shape[1]], dtype='int32')
+            token_num = np.array([position.shape[1]], dtype='int32')
+            inputs = [words, position, batch_size, max_len, token_num]
+            for handle, _input in zip(input_handles, inputs):
+                handle.reshape(_input.shape)
+                handle.copy_from_cpu(_input)
+            model.run()
+            output_names = model.get_output_names()
+            outputs = []
+            for output_name in output_names:
+                output_handle = model.get_output_handle(output_name)
+                outputs.append(output_handle.copy_to_cpu())
+            s_arc, s_rel, words = outputs
+
+        else:
+            raise KeyError("error encoding_model({args.encoding_model}) should be ernie-lstm.")
+        mask = np.logical_and(
+            np.logical_and(words != pad_index, words != bos_index),
+            words != eos_index,
+        )
+        lens = np.sum(mask, -1)
+        arc_preds, rel_preds = decode_infer(args, s_arc, s_rel, mask, lens)
+        arcs.extend(np.split(arc_preds[mask], np.cumsum(lens))[:-1])
+        rels.extend(np.split(rel_preds[mask], np.cumsum(lens))[:-1])
+        def softmax(x, axis=-1):
+            """Compute softmax values for each sets of scores in x."""
+            return np.exp(x) / np.sum(np.exp(x), axis=axis, keepdims=True)
+        if args.prob:
+            arc_probs = softmax(s_arc, -1)
+            arc_index = np.expand_dims(arc_preds, -1)
+            addend = np.reshape(np.arange(0, stop=reduce(lambda x, y : x * y, arc_probs.shape), step=arc_probs.shape[-1]), arc_index.shape)
+            arc_probs = np.take(arc_probs, addend + arc_index)
+            probs.extend(np.split(np.squeeze(arc_probs, axis=-1)[mask], np.cumsum(lens))[:-1])
+    arcs = [seq.tolist() for seq in arcs]
+    rels = [env.REL.vocab[seq.tolist()] for seq in rels]
+    probs = [[round(p, 3) for p in seq.tolist()] for seq in probs]
+
+    return arcs, rels, probs
 
 def loss_function(s_arc, s_rel, arcs, rels, mask):
     """Loss function"""
@@ -252,6 +358,20 @@ def decode(args, s_arc, s_rel, mask):
     rel_preds = layers.squeeze(rel_preds, axes=[-1])
     return arc_preds, rel_preds
 
+def decode_infer(args, s_arc, s_rel, mask, lens):
+    """Decode function"""
+    # prevent self-loops
+    arc_preds = np.argmax(s_arc, -1)
+    bad = [not utils.istree(seq[:i + 1]) for i, seq in zip(lens, arc_preds)]
+    if args.tree and any(bad):
+        arc_preds[bad] = utils.eisner(s_arc[bad], mask[bad])
+    rel_preds = np.argmax(s_rel, axis=-1)
+    # batch_size, seq_len, _ = rel_preds.shape
+    rel_index = np.expand_dims(arc_preds, -1)
+    addend = np.reshape(np.arange(0, stop=reduce(lambda x, y : x * y, rel_preds.shape), step=rel_preds.shape[-1]), rel_index.shape)
+    rel_preds = np.take(rel_preds, addend + rel_index)
+    rel_preds = np.squeeze(rel_preds, axis=-1)
+    return arc_preds, rel_preds
 
 def save(path, args, model, optimizer):
     """Saving model"""
@@ -273,10 +393,20 @@ def load(path, model=None, mode="evaluate"):
     return model
 
 
-def load_static(path):
+def load_static(path, use_cuda):
     """Loading model in static graph"""
-    model = paddle.jit.load(path)
-    return model
+    # model = paddle.jit.load(path)
+    config = paddle_infer.Config(path + ".pdmodel", path + ".pdiparams")
+    config.enable_memory_optim()
+    if use_cuda:
+        config.enable_use_gpu(1000, 0)
+    predictor = paddle_infer.create_predictor(config)
+    input_names = predictor.get_input_names()
+    input_handles = []
+    for input_name in input_names:
+        input_handles.append(predictor.get_input_handle(input_name))
+    output_names = predictor.get_output_names()
+    return predictor, input_handles, output_names
 
 
 def save_static(path, model, args, fields):

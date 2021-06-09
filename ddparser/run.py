@@ -46,7 +46,9 @@ from ddparser.ernie.optimization import AdamW
 from ddparser.ernie.optimization import LinearDecay
 from ddparser.parser import epoch_train
 from ddparser.parser import epoch_evaluate
+from ddparser.parser import epoch_evaluate_infer
 from ddparser.parser import epoch_predict
+from ddparser.parser import epoch_predict_infer
 from ddparser.parser import save
 from ddparser.parser import load
 from ddparser.parser import save_static
@@ -186,16 +188,22 @@ def evaluate(env):
                  "{} buckets".format(len(dataset.buckets)))
     logging.info("Load the model")
     if args.is_static:
-        model = load_static(args.model_path)
+        model, input_handles, output_names = load_static(args.model_path, args.use_cuda)
+        logging.info("Evaluate the dataset")
+        start = datetime.datetime.now()
+        metric = epoch_evaluate_infer(args, model, dataset.loader, puncts, input_handles, output_names)
+        total_time = datetime.datetime.now() - start
+        logging.info("{}".format(metric))
+        logging.info("{}s elapsed, {:.2f} Sents/s".format(total_time, len(dataset) / total_time.total_seconds()))
     else:
         model = load(args.model_path)
 
-    logging.info("Evaluate the dataset")
-    start = datetime.datetime.now()
-    loss, metric = epoch_evaluate(args, model, dataset.loader, puncts)
-    total_time = datetime.datetime.now() - start
-    logging.info("Loss: {:.4f} {}".format(loss, metric))
-    logging.info("{}s elapsed, {:.2f} Sents/s".format(total_time, len(dataset) / total_time.total_seconds()))
+        logging.info("Evaluate the dataset")
+        start = datetime.datetime.now()
+        loss, metric = epoch_evaluate(args, model, dataset.loader, puncts)
+        total_time = datetime.datetime.now() - start
+        logging.info("Loss: {:.4f} {}".format(loss, metric))
+        logging.info("{}s elapsed, {:.2f} Sents/s".format(total_time, len(dataset) / total_time.total_seconds()))
 
 
 def predict(env):
@@ -239,7 +247,7 @@ def predict_query(env):
     args = env.args
     logging.info("Load the model")
     if args.is_static:
-        model = load_static(args.model_path)
+        model = load_static(args.model_path, args.use_cuda)
     else:
         model = load(args.model_path)
     model.eval()
@@ -343,9 +351,11 @@ class DDParser(object):
         paddle.set_device(self.env.place)
         if not is_static:
             self.model = load(self.args.model_path)
+            self.model.eval()   
         else:
-            self.model = load_static(self.args.model_path)
-        self.model.eval()
+            self.model, self.input_handles, self.output_names = load_static(self.args.model_path)
+            self.parse = self.parse_infer
+            self.parse_seg = self.parse_seg_infer
         self.lac = None
         self.use_pos = use_pos
         # buckets=None if not buckets else defaults
@@ -436,6 +446,78 @@ class DDParser(object):
         outputs = predicts.get_result()
         return outputs
 
+    def parse_infer(self, inputs):
+        """
+        预测未切词的句子。
+
+        Args:
+            x: list(str) | str, 未分词的句子，类型为str或list
+
+        Returns:
+            outputs: list, 依存分析结果
+
+        Example:
+        >>> ddp = DDParser()
+        >>> inputs = "百度是一家高科技公司"
+        >>> ddp.parse(inputs)
+        [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']}]
+
+        >>> inputs = ["百度是一家高科技公司", "他送了一本书"]
+        >>> ddp.parse(inputs)
+        [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']},
+         {'word': ['他', '送', '了', '一本', '书'], 'head': [2, 0, 2, 5, 2], 'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
+
+        >>> ddp = DDParser(prob=True, use_pos=True)
+        >>> inputs = "百度是一家高科技公司"
+        >>> ddp.parse(inputs)
+        [{'word': ['百度', '是', '一家', '高科技', '公司'], 'postag': ['ORG', 'v', 'm', 'n', 'n'],
+        'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'], 'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
+        """
+        if not self.lac:
+            self.lac = LAC.LAC(mode="lac" if self.use_pos else "seg", use_cuda=self.args.use_cuda)
+        if not inputs:
+            return
+        if isinstance(inputs, six.string_types):
+            inputs = [inputs]
+        if all([isinstance(i, six.string_types) and i for i in inputs]):
+            lac_results = []
+            position = 0
+            try:
+                inputs = [query if isinstance(query, six.text_type) else query.decode("utf-8") for query in inputs]
+            except UnicodeDecodeError:
+                logging.warning("encoding only supports UTF-8!")
+                return
+
+            while position < len(inputs):
+                lac_results += self.lac.run(inputs[position:position + self.args.batch_size])
+                position += self.args.batch_size
+            predicts = Corpus.load_lac_results(lac_results, self.env.fields)
+        else:
+            logging.warning("please check the foramt of your inputs.")
+            return
+        dataset = TextDataset(predicts, [self.env.WORD, self.env.FEAT], self.args.buckets)
+        # set the data loader
+
+        dataset.loader = batchify(
+            dataset,
+            self.args.batch_size,
+            use_multiprocess=False,
+            sequential_sampler=True if not self.args.buckets else False,
+        )
+        pred_arcs, pred_rels, pred_probs = epoch_predict_infer(self.env, self.args, self.model, dataset.loader, self.input_handles, self.output_names)
+
+        if self.args.buckets:
+            indices = np.argsort(np.array([i for bucket in dataset.buckets.values() for i in bucket]))
+        else:
+            indices = range(len(pred_arcs))
+        predicts.head = [pred_arcs[i] for i in indices]
+        predicts.deprel = [pred_rels[i] for i in indices]
+        if self.args.prob:
+            predicts.prob = [pred_probs[i] for i in indices]
+
+        outputs = predicts.get_result()
+        return outputs
+
     def parse_seg(self, inputs):
         """
         预测已切词的句子。
@@ -476,6 +558,62 @@ class DDParser(object):
             sequential_sampler=True if not self.args.buckets else False,
         )
         pred_arcs, pred_rels, pred_probs = epoch_predict(self.env, self.args, self.model, dataset.loader)
+
+        if self.args.buckets:
+            indices = np.argsort(np.array([i for bucket in dataset.buckets.values() for i in bucket]))
+        else:
+            indices = range(len(pred_arcs))
+        predicts.head = [pred_arcs[i] for i in indices]
+        predicts.deprel = [pred_rels[i] for i in indices]
+        if self.args.prob:
+            predicts.prob = [pred_probs[i] for i in indices]
+
+        outputs = predicts.get_result()
+        if outputs[0].get("postag", None):
+            for output in outputs:
+                del output["postag"]
+        return outputs
+
+    def parse_seg_infer(self, inputs):
+        """
+        预测已切词的句子。
+
+        Args:
+            x: list(list(str)), 已分词的句子，类型为list
+
+        Returns:
+            outputs: list, 依存分析结果
+
+        Example:
+        >>> ddp = DDParser()
+        >>> inputs = [['百度', '是', '一家', '高科技', '公司'], ['他', '送', '了', '一本', '书']]
+        >>> ddp.parse_seg(inputs)
+        [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': [2, 0, 5, 5, 2], 'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB']},
+        {'word': ['他', '送', '了', '一本', '书'], 'head': [2, 0, 2, 5, 2], 'deprel': ['SBV', 'HED', 'MT', 'ATT', 'VOB']}]
+
+
+        >>> ddp = DDParser(prob=True)
+        >>> inputs = [['百度', '是', '一家', '高科技', '公司']]
+        >>> ddp.parse_seg(inputs)
+        [{'word': ['百度', '是', '一家', '高科技', '公司'], 'head': [2, 0, 5, 5, 2],
+        'deprel': ['SBV', 'HED', 'ATT', 'ATT', 'VOB'], 'prob': [1.0, 1.0, 1.0, 1.0, 1.0]}]
+        """
+        if not inputs:
+            return
+        if all([isinstance(i, list) and i and all(i) for i in inputs]):
+            predicts = Corpus.load_word_segments(inputs, self.env.fields)
+        else:
+            logging.warning("please check the foramt of your inputs.")
+            return
+        dataset = TextDataset(predicts, [self.env.WORD, self.env.FEAT], self.args.buckets)
+        # set the data loader
+        dataset.loader = batchify(
+            dataset,
+            self.args.batch_size,
+            use_multiprocess=False,
+            sequential_sampler=True if not self.args.buckets else False,
+        )
+        pred_arcs, pred_rels, pred_probs = epoch_predict_infer(self.env, self.args, self.model, dataset.loader, self.input_handles, self.output_names)
 
         if self.args.buckets:
             indices = np.argsort(np.array([i for bucket in dataset.buckets.values() for i in bucket]))

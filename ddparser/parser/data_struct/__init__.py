@@ -33,8 +33,9 @@ from .data import TextDataLoader
 from .data import TextDataset
 from .embedding import Embedding
 from .metric import Metric
+from .metric import MetricInfer
 
 __all__ = [
     'batchify', 'utils', 'BucketsSampler', 'Embedding', 'ErnieField', 'Field', 'Metric', 'SequentialSampler',
-    'SubwordField', 'TextDataLoader', 'TextDataset', 'Vocab'
+    'SubwordField', 'TextDataLoader', 'TextDataset', 'Vocab', 'MetricInfer'
 ]
