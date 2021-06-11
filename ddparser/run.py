@@ -353,7 +353,7 @@ class DDParser(object):
             self.model = load(self.args.model_path)
             self.model.eval()   
         else:
-            self.model, self.input_handles, self.output_names = load_static(self.args.model_path)
+            self.model, self.input_handles, self.output_names = load_static(self.args.model_path, use_cuda)
             self.parse = self.parse_infer
             self.parse_seg = self.parse_seg_infer
         self.lac = None
