@@ -20,7 +20,6 @@
 import numpy as np
 import paddle
 from paddle.fluid import layers
-from paddle.fluid.core_avx import VarDesc
 
 
 def pad_sequence(sequences, padding_value=0, fix_len=None):
