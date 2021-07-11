@@ -105,16 +105,11 @@ def train(env):
     if args.encoding_model.startswith("ernie") and args.encoding_model != "ernie-lstm":
         max_steps = 100 * len(train.loader)
         decay = LinearDecay(args.lr, int(args.warmup_proportion * max_steps), max_steps)
-        clip = args.ernie_clip
     else:
         decay = dygraph.ExponentialDecay(learning_rate=args.lr, decay_steps=args.decay_steps, decay_rate=args.decay)
-        clip = args.clip
-
-    if args.use_cuda:
-        grad_clip = fluid.clip.GradientClipByNorm(clip_norm=clip)
-    else:
-        grad_clip = fluid.clip.GradientClipByGlobalNorm(clip_norm=clip)
-
+        
+    grad_clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.clip)
+    
     if args.encoding_model.startswith("ernie") and args.encoding_model != "ernie-lstm":
         optimizer = AdamW(
             learning_rate=decay,
@@ -327,7 +322,7 @@ class DDParser(object):
         args.log_path = None
         self.env = Environment(args)
         self.args = self.env.args
-        fluid.enable_imperative(self.env.place)
+        paddle.set_device(self.env.place)
         self.model = load(self.args.model_path)
         self.model.eval()
         self.lac = None
@@ -478,8 +473,10 @@ class DDParser(object):
 if __name__ == "__main__":
     logging.info("init arguments.")
     args = ArgConfig()
+    
     logging.info("init environment.")
     env = Environment(args)
+
     logging.info("Override the default configs\n{}".format(env.args))
     logging.info("{}\n{}\n{}\n{}".format(env.WORD, env.FEAT, env.ARC, env.REL))
     logging.info("Set the max num of threads to {}".format(env.args.threads))

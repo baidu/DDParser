@@ -96,7 +96,7 @@ class Model(dygraph.Layer):
         s_arc_mask = paddle.unsqueeze(mask, 1)
         s_arc = s_arc * s_arc_mask + paddle.scale(
             paddle.cast(s_arc_mask, 'int32'), scale=1e5, bias=-1, bias_after_scale=False)
-
+   
         return s_arc, s_rel, words
 
 
@@ -124,14 +124,12 @@ def epoch_train(args, model, optimizer, loader, epoch):
         )
 
         loss = loss_function(s_arc, s_rel, arcs, rels, mask)
-        if args.use_data_parallel:
-            loss.backward()
-        else:
-            loss.backward()
+        loss.backward()
+
         optimizer.minimize(loss)
         total_loss += loss.numpy().item()
         logging.info("epoch: {}, batch: {}/{}, batch_size: {}, loss: {:.4f}".format(
-            epoch, batch, math.ceil(len(loader) / args.nranks), len(words),
+            epoch, batch, math.ceil(len(loader)), len(words),
             loss.numpy().item()))
     total_loss /= len(loader)
     return total_loss

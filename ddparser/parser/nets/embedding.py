@@ -180,7 +180,7 @@ class LSTMByWPEmbed(PretraEmbedding):
         self.mlp_input_size = args.n_lstm_hidden * 2
 
     def init_ernie_model(self, args):
-        self.word_embed = dygraph.Embedding(size=(args.ernie_vocabs_size, args.lstm_by_wp_embed_size))
+        self.word_embed = paddle.nn.Embedding(args.ernie_vocabs_size, args.lstm_by_wp_embed_size)
 
     def flat_words(self, words):
         pad_index = self.args.pad_index
