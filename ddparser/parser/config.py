@@ -285,7 +285,7 @@ class Environment(object):
         
         if args.encoding_model.startswith("ernie"):
             vocab_items = self.WORD.vocab.items()
-            args["ernie_vocabs_size"] = len(self.WORD.tokenizer.vocab)
+            args["ernie_vocabs_size"] = len(self.WORD.vocab)
         else:
             vocab_items = self.WORD.vocab.stoi.items()
 
