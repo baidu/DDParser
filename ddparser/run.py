@@ -36,6 +36,7 @@ try:
 except:
     pass
 import nltk
+
 nltk.data.path.insert(0, os.path.dirname(__file__) + '/nltk_data')
 import numpy as np
 import paddle.distributed as dist
@@ -97,8 +98,9 @@ def train(env):
         dist.init_parallel_env()
         model = paddle.DataParallel(model)
 
-    if args.encoding_model.startswith(
-            "ernie") and args.encoding_model not in ["ernie-lstm", "ernie-lstm-en"] or args.encoding_model == 'transformer':
+    if args.encoding_model.startswith("ernie") and args.encoding_model not in [
+            "ernie-lstm", "ernie-lstm-en"
+    ] or args.encoding_model == 'transformer':
         args['lr'] = args.ernie_lr
     else:
         args['lr'] = args.lstm_lr
@@ -338,20 +340,24 @@ class DDParser(object):
         # set default batch size if batch_size is None and not buckets
         if batch_size is None and not buckets:
             self.args.batch_size = 50
-            
+
     def get_seg_and_pos(self, sentences):
         results = []
         for sentence in sentences:
             tokens = nltk.word_tokenize(sentence)
             tagged = nltk.pos_tag(tokens)
-        results.append(list(zip(*tagged)))
+            tagged = nltk.pos_tag(tokens)
+            tagged = [('"', tag[1]) if tag in [('``', '``'), ("''", "''")] else tag for tag in tagged]
+            results.append(list(zip(*tagged)))
         return results
-    
+
     def get_pos(self, seg_tokens):
         results = []
         for tokens in seg_tokens:
             tagged = nltk.pos_tag(tokens)
-        results.append(list(zip(*tagged)))
+            tagged = nltk.pos_tag(tokens)
+            tagged = [('"', tag[1]) if tag in [('``', '``'), ("''", "''")] else tag for tag in tagged]
+            results.append(list(zip(*tagged)))
         return results
 
     def parse(self, inputs):
@@ -486,10 +492,10 @@ class DDParser(object):
 if __name__ == "__main__":
     logging.info("init arguments.")
     args = ArgConfig()
-    
+
     logging.info("init environment.")
     env = Environment(args)
-    
+
     logging.info("Override the default configs\n{}".format(env.args))
     logging.info("{}\n{}\n{}\n{}".format(env.WORD, env.FEAT, env.ARC, env.REL))
     logging.info("Set the max num of threads to {}".format(env.args.threads))
