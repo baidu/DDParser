@@ -198,7 +198,7 @@ def epoch_predict(env, args, model, loader):
         arcs.extend(layers.split(nn.masked_select(arc_preds, mask), lens.numpy().tolist()))
         rels.extend(layers.split(nn.masked_select(rel_preds, mask), lens.numpy().tolist()))
         if args.prob:
-            arc_probs = nn.index_sample(layers.softmax(s_arc, -1), layers.unsqueeze(arc_preds, -1))
+            arc_probs = nn.index_sample(layers.softmax(s_arc, axis=-1), layers.unsqueeze(arc_preds, -1))
             probs.extend(
                 layers.split(
                     nn.masked_select(layers.squeeze(arc_probs, axes=[-1]), mask),
