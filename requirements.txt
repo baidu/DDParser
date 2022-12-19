@@ -1,4 +1,4 @@
-paddlepaddle-gpu>=2.0
+paddlepaddle-gpu>=2.3
 LAC>=2.1
 tqdm
 configparser

@@ -32,17 +32,17 @@ install_requires = []
 try:
     import paddle
     # 若版本太低，设置版本的更新
-    if paddle.__version__ < '2.0':
+    if paddle.__version__ < '2.3':
         installed_packages = pkg_resources.working_set
         paddle_pkgs = [i.key for i in installed_packages if "paddle" in i.key]
 
         if "paddlepaddle-gpu" in paddle_pkgs:
-            install_requires = ['paddlepaddle-gpu>=2.0']
+            install_requires = ['paddlepaddle-gpu>=2.3']
         elif "paddlepaddle" in paddle_pkgs:
-            install_requires = ['paddlepaddle>=2.0']
+            install_requires = ['paddlepaddle>=2.3']
 
 except ImportError:
-    install_requires = ['paddlepaddle>=2.0']
+    install_requires = ['paddlepaddle>=2.3']
 try:
     import LAC
     # 若版本太低，设置版本的更新
@@ -55,7 +55,7 @@ with open("README.md", "r", encoding='utf8') as fh:
     long_description = fh.read()
 setup(
     name="ddparser",
-    version="1.0.6",
+    version="1.0.7",
     author="Baidu NLP",
     author_email="nlp-parser@baidu.com",
     description="A chinese dependency parser tool by Baidu NLP.",
@@ -63,7 +63,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/baidu/ddparser",
     install_requires=install_requires,
-    python_requires=">=2.7",
+    python_requires=">=3.6",
     packages=setuptools.find_packages(),
     include_package_data=True,
     platforms="any",
@@ -72,7 +72,6 @@ setup(
     classifiers=[
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',

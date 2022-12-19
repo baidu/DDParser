@@ -18,7 +18,7 @@
 """ddparser"""
 
 name = 'ddparser'
-version = "1.0.6"
-version_info = (1, 0, 6)
+version = "1.0.7"
+version_info = (1, 0, 7)
 
 from .run import DDParser

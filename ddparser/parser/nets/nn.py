@@ -20,7 +20,6 @@
 import numpy as np
 import paddle
 from paddle.fluid import layers
-from paddle.fluid.core_avx import VarDesc
 
 
 def pad_sequence(sequences, padding_value=0, fix_len=None):
@@ -279,19 +278,11 @@ def mask_fill(input, mask, value):
 
 def unsqueeze(input, axes):
     """Increase the number of axes of input"""
-    input_dtype = input.dtype
-    if input_dtype == VarDesc.VarType.BOOL:
-        input = layers.cast(input, 'int32')
     output = layers.unsqueeze(input, axes=axes)
-    if input_dtype == VarDesc.VarType.BOOL:
-        output = layers.cast(output, 'bool')
     return output
 
 
 def reduce_sum(input, dim):
     """Computes the sum of tensor elements over the given dimension."""
-    input_dtype = input.dtype
-    if input_dtype == VarDesc.VarType.BOOL:
-        input = layers.cast(input, 'int32')
     output = layers.reduce_sum(input, dim=dim)
     return output
