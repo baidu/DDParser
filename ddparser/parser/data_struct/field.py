@@ -144,7 +144,8 @@ class Field(RawField):
             if not sequence: sequence = [self.unk]
         if self.lower:
             sequence = [token.lower() for token in sequence]
-
+        # If the sequence contains special characters, convert it to unk
+        sequence = [self.unk if token in self.specials else token for token in sequence]
         return sequence
 
     def build(self, corpus, min_freq=1):

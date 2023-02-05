@@ -55,7 +55,7 @@ with open("README.md", "r", encoding='utf8') as fh:
     long_description = fh.read()
 setup(
     name="ddparser",
-    version="1.0.7",
+    version="1.0.8",
     author="Baidu NLP",
     author_email="nlp-parser@baidu.com",
     description="A chinese dependency parser tool by Baidu NLP.",
@@ -63,7 +63,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/baidu/ddparser",
     install_requires=install_requires,
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     packages=setuptools.find_packages(),
     include_package_data=True,
     platforms="any",
@@ -72,7 +72,6 @@ setup(
     classifiers=[
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
     ],
